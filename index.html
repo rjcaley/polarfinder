@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#0b0d10">
+<title>PolarFinder — B+W KSM 46</title>
+<link rel="manifest" href="manifest.webmanifest">
+<style>
+:root{
+  --bg:#0b0d10; --panel:#14181d; --panel2:#1b2027; --line:#2a323c;
+  --fg:#eef2f6; --dim:#93a1b0; --gold:#e8c98a; --hot:#ff4d4d;
+  --ok:#4ade80; --warn:#fbbf24;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--fg);
+  font:16px/1.45 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  overscroll-behavior:none}
+body{padding:env(safe-area-inset-top) 12px calc(12px + env(safe-area-inset-bottom))}
+h1{font-size:15px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);
+  margin:10px 0 6px;font-weight:600}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;
+  padding:12px;margin-bottom:10px}
+.row{display:flex;gap:8px;align-items:center}
+.row.wrap{flex-wrap:wrap}
+.grow{flex:1}
+button{font:inherit;color:var(--fg);background:var(--panel2);border:1px solid var(--line);
+  border-radius:11px;padding:11px 14px;font-weight:600;cursor:pointer}
+button:active{background:#2b333d}
+button.pri{background:#1f6feb;border-color:#1f6feb}
+button.hot{background:#7f1d1d;border-color:#991b1b}
+button.on{background:#166534;border-color:#16a34a}
+button.sm{padding:7px 10px;font-size:14px;font-weight:500}
+input,select{font:inherit;color:var(--fg);background:#0e1216;border:1px solid var(--line);
+  border-radius:9px;padding:9px;width:100%}
+label{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em;
+  display:block;margin-bottom:4px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.big{font-size:30px;font-weight:700;line-height:1.15;letter-spacing:-.01em}
+.mono{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;font-variant-numeric:tabular-nums}
+.dim{color:var(--dim)}
+.tiny{font-size:12px}
+.kv{display:flex;justify-content:space-between;gap:10px;padding:3px 0;font-size:14px}
+.kv b{font-weight:600;font-variant-numeric:tabular-nums}
+.bar{height:9px;border-radius:5px;background:#0e1216;overflow:hidden;border:1px solid var(--line)}
+.bar>i{display:block;height:100%;background:linear-gradient(90deg,#7c3aed,#22d3ee,#4ade80)}
+.hide{display:none!important}
+.pill{font-size:11px;padding:3px 8px;border-radius:99px;border:1px solid var(--line);
+  color:var(--dim);text-transform:uppercase;letter-spacing:.08em}
+.pill.ok{color:var(--ok);border-color:#14532d}
+.pill.bad{color:var(--hot);border-color:#7f1d1d}
+.pill.warn{color:var(--warn);border-color:#78350f}
+svg{display:block;width:100%;height:auto;touch-action:none}
+.tabs{display:flex;gap:6px;margin:8px 0}
+.tabs button{flex:1;padding:9px;font-size:14px}
+.note{font-size:13px;color:var(--dim);line-height:1.5}
+.note b{color:var(--fg)}
+ol.steps{padding-left:20px;font-size:14px;line-height:1.6}
+ol.steps li{margin-bottom:9px}
+hr{border:0;border-top:1px solid var(--line);margin:12px 0}
+.frozen{outline:2px solid var(--warn);outline-offset:2px}
+</style>
+</head>
+<body>
+
+<div class="row" style="margin-top:8px">
+  <div class="grow">
+    <div style="font-weight:700;letter-spacing:-.01em">PolarFinder</div>
+    <div class="tiny dim">B+W 46 KSM HTC-POL MRC nano MASTER · Leica M</div>
+  </div>
+  <span id="sensorPill" class="pill">sensors off</span>
+</div>
+
+<div class="tabs">
+  <button id="tabAim" class="on">Aim</button>
+  <button id="tabCal">Calibrate</button>
+  <button id="tabHelp">Physics</button>
+</div>
+
+<!-- ══════════════════ AIM ══════════════════ -->
+<div id="paneAim">
+
+  <div class="card" id="ringCard">
+    <div class="row" style="margin-bottom:6px">
+      <div class="grow tiny dim">Rotate the filter until this marking sits at the top of your lens</div>
+      <span class="pill">front view</span>
+    </div>
+    <svg id="ring" viewBox="-320 -320 640 640" aria-label="filter ring"></svg>
+  </div>
+
+  <div class="card">
+    <div class="big" id="instr">Waiting for position…</div>
+    <div class="tiny dim" id="instr2" style="margin-top:6px"></div>
+    <div class="tiny dim" id="instr3" style="margin-top:4px"></div>
+  </div>
+
+  <div class="row" style="margin-bottom:10px">
+    <button id="btnFreeze" class="pri grow">Hold reading</button>
+    <button id="btnStart" class="grow">Enable sensors</button>
+  </div>
+
+  <div class="card">
+    <div class="row" style="margin-bottom:6px">
+      <div class="grow" style="font-weight:600">Polarization available</div>
+      <span id="dopPill" class="pill">—</span>
+    </div>
+    <div class="bar"><i id="dopBar" style="width:0%"></i></div>
+    <div class="kv"><span class="dim">Sun–subject angle γ</span><b id="kGamma" class="mono">—</b></div>
+    <div class="kv"><span class="dim">Max darkening of polarized part</span><b id="kRatio" class="mono">—</b></div>
+    <div class="kv"><span class="dim">Filter axis in frame</span><b id="kTheta" class="mono">—</b></div>
+    <div class="tiny dim" id="dopNote" style="margin-top:6px"></div>
+  </div>
+
+  <div class="card">
+    <div class="kv"><span class="dim">Sun azimuth / altitude</span><b id="kSun" class="mono">—</b></div>
+    <div class="kv"><span class="dim">Camera azimuth / elevation</span><b id="kCam" class="mono">—</b></div>
+    <div class="kv"><span class="dim">Position</span><b id="kPos" class="mono">—</b></div>
+    <div class="kv"><span class="dim">Local time</span><b id="kTime" class="mono">—</b></div>
+    <hr>
+    <div class="grid2">
+      <div>
+        <label>Frame</label>
+        <select id="selFrame">
+          <option value="level">Landscape, level</option>
+          <option value="port">Portrait, level</option>
+          <option value="phone">Follow phone roll</option>
+        </select>
+      </div>
+      <div>
+        <label>Aim source</label>
+        <select id="selAim">
+          <option value="sensor">Phone compass</option>
+          <option value="manual">Type it in</option>
+        </select>
+      </div>
+    </div>
+    <div id="manualBox" class="grid2 hide" style="margin-top:8px">
+      <div><label>Camera azimuth °</label><input id="inAz" type="number" value="0" step="1"></div>
+      <div><label>Camera elevation °</label><input id="inEl" type="number" value="0" step="1"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════ CALIBRATE ══════════════════ -->
+<div id="paneCal" class="hide">
+
+  <div class="card">
+    <div class="row"><div class="grow" style="font-weight:700">Status</div></div>
+    <div class="kv"><span class="dim">Step 1 · Filter axis ψ<sub>T</sub></span><span id="stA" class="pill bad">not set</span></div>
+    <div class="kv"><span class="dim">Step 2 · Compass offset</span><span id="stB" class="pill bad">not set</span></div>
+    <div class="kv"><span class="dim">Step 3 · Handedness check</span><span id="stC" class="pill bad">not done</span></div>
+    <div class="tiny dim" style="margin-top:8px">Do these in order, whenever you have time. Everything is saved on this phone.
+      The app is usable after Step 1 alone; Steps 2 and 3 tighten it up.</div>
+  </div>
+
+  <div class="card">
+    <h1>Step 1 · Where is the filter's axis?</h1>
+    <div class="note">Your filter's engraving has no fixed relationship to its transmission axis — B+W does not
+      index them. This one measurement ties the two together, and only has to be done once.
+      <b>No phone sensors needed.</b></div>
+    <ol class="steps">
+      <li>Find a horizontal, shiny, non-metal surface with a reflection on it: a puddle, a glass tabletop,
+        a polished wood table, a car's paint, a wet road.</li>
+      <li>Stand back so you are looking down at the reflection at a shallow-ish angle — roughly
+        30–40° below horizontal is ideal. <b>Keep your head level.</b></li>
+      <li>Hold the filter up to your eye <b>the right way round</b>: the front (engraved) face toward the
+        reflection, the back toward your eye. A circular polarizer only works in that direction.</li>
+      <li>Rotate the filter slowly. The reflection will get strongly darker at one point and brightest 90°
+        away. Park it at the <b>darkest</b> point.</li>
+      <li>Without rotating it further, read which marking is at the <b>top</b> of the filter and enter it below.
+        Use the dial to match what you see.</li>
+    </ol>
+    <div style="margin:10px 0">
+      <svg id="calRing" viewBox="-320 -320 640 640"></svg>
+    </div>
+    <label>Drag the dial, or type the ring angle directly (° clockwise from the "4" side of 46)</label>
+    <div class="row">
+      <input id="inPsiT" type="number" step="0.5" value="0" class="grow">
+      <button id="btnSavePsi" class="pri">Save</button>
+    </div>
+    <div class="tiny dim" style="margin-top:6px" id="psiReadout"></div>
+  </div>
+
+  <div class="card">
+    <h1>Step 2 · Compass offset (shadow sight)</h1>
+    <div class="note">Phone magnetometers read magnetic north, drift near the brass and steel of an M-body, and
+      Chrome does not tell us your magnetic declination. One sun sight fixes all three at once.
+      <b>Redo this if you travel a long way or the readings look wrong.</b> Never sight the sun by eye.</div>
+    <ol class="steps">
+      <li>Pick a sunny moment and a flat patch of ground. Stand a pen, bottle or post upright on it.</li>
+      <li>The shadow points directly away from the sun. Stand at the <b>tip of the shadow</b>.</li>
+      <li>Hold the phone upright, screen toward you, and aim its back squarely along the shadow
+        <b>toward the object</b> — that is, toward the sun, but keep your eyes on the screen.</li>
+      <li>Hold steady and tap Capture. Do it three or four times and the app will average them.</li>
+    </ol>
+    <div class="kv"><span class="dim">Computed sun azimuth</span><b id="calSunAz" class="mono">—</b></div>
+    <div class="kv"><span class="dim">Raw compass azimuth</span><b id="calRawAz" class="mono">—</b></div>
+    <div class="kv"><span class="dim">Stored offset</span><b id="calOff" class="mono">0.0°</b></div>
+    <div class="row" style="margin-top:8px">
+      <button id="btnCapAz" class="pri grow">Capture sight</button>
+      <button id="btnClrAz">Clear</button>
+    </div>
+    <div class="tiny dim" style="margin-top:6px" id="azSamples"></div>
+  </div>
+
+  <div class="card">
+    <h1>Step 3 · Handedness check</h1>
+    <div class="note">There are two ways the ring's rotation could map onto the sky, and they differ by a mirror.
+      Step 1 cannot tell them apart. This test can. You need the sun <b>roughly 45° off to one side</b> of
+      what you are photographing and <b>well above the horizon</b> — mid-morning or mid-afternoon, aimed at
+      blue sky. The app will tell you when the geometry is good.</div>
+    <div class="kv"><span class="dim">Geometry right now</span><span id="hdGeo" class="pill">—</span></div>
+    <div class="kv"><span class="dim">Setting A (current)</span><b id="hdA" class="mono">—</b></div>
+    <div class="kv"><span class="dim">Setting B (mirrored)</span><b id="hdB" class="mono">—</b></div>
+    <ol class="steps" style="margin-top:8px">
+      <li>Aim at open blue sky, hold the reading, then set the ring to <b>Setting A</b> and look through the filter.</li>
+      <li>Set it to <b>Setting B</b> and look again.</li>
+      <li>Tell the app which one made the sky darker.</li>
+    </ol>
+    <div class="row">
+      <button id="btnHandA" class="grow">A was darker</button>
+      <button id="btnHandB" class="grow">B was darker</button>
+    </div>
+    <div class="tiny dim" style="margin-top:6px" id="handNote"></div>
+  </div>
+
+  <div class="card">
+    <h1>Manual overrides</h1>
+    <div class="grid2">
+      <div><label>Compass offset °</label><input id="inOff" type="number" step="0.1" value="0"></div>
+      <div><label>Magnetic declination °</label><input id="inDec" type="number" step="0.1" value="0"></div>
+    </div>
+    <div class="tiny dim" style="margin-top:6px">Declination is only used if you have not done a shadow sight.
+      Leave it at 0 once Step 2 is done — the sight already includes it.</div>
+    <hr>
+    <div class="grid2">
+      <div><label>Latitude</label><input id="inLat" type="number" step="0.0001"></div>
+      <div><label>Longitude</label><input id="inLon" type="number" step="0.0001"></div>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button id="btnGeo" class="grow">Use GPS</button>
+      <button id="btnReset" class="hot">Reset all</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════ HELP ══════════════════ -->
+<div id="paneHelp" class="hide">
+  <div class="card">
+    <h1>The one rule</h1>
+    <div class="note">Point the filter's transmission axis <b>at the sun's position projected into your frame</b>.
+      That is the whole thing. Everything below is why.</div>
+  </div>
+  <div class="card">
+    <h1>Why that works</h1>
+    <div class="note">
+      <p>Light that reaches your lens from blue sky got there by scattering off air molecules. Light that makes
+      leaves and paint look glossy got there by glancing off a surface. Both are single-bounce events, and both
+      obey the same rule: the scattered light's electric field ends up <b>perpendicular to the scattering plane</b>
+      — the plane containing the sun, the thing doing the scattering, and you.</p>
+      <p>A polarizer passes light whose field is along its transmission axis and blocks light perpendicular to it.
+      So to kill the scattered light you want the axis perpendicular to that field, which means the axis must
+      <b>lie in the scattering plane</b>. Project the sun's direction onto your image plane and you have it.</p>
+      <p>The nice consequence: sky darkening and sheen removal want the <b>same</b> filter angle, because they
+      share the same sun and the same viewing direction. You are never trading one against the other.</p>
+    </div>
+  </div>
+  <div class="card">
+    <h1>How much you get</h1>
+    <div class="note">
+      <p>For clear sky the Rayleigh model gives degree of polarization
+      <span class="mono">P = P<sub>max</sub>·sin²γ / (1 + cos²γ)</span>, where γ is the angle between the sun and
+      where you are pointing. It peaks at <b>γ = 90°</b> — the famous band across the sky at right angles to the
+      sun — and falls to zero looking straight at or straight away from the sun. Real skies reach roughly
+      P<sub>max</sub> ≈ 0.75 rather than 1.0, because of multiple scattering, aerosols and ground reflection;
+      humid or hazy air pushes it lower still.</p>
+      <p>Specular sheen off leaves and paint follows Fresnel instead. Its polarization peaks where light strikes
+      the surface near <b>Brewster's angle</b>, about 55° for waxy leaf cuticle and clear coat, which corresponds
+      to γ ≈ 68°. Because leaves point every which way, the effect stays useful across a broad range of γ — call
+      it 40° to 120°.</p>
+      <p>Water and glass reflections are a special case you barely need this app for: those surfaces are usually
+      horizontal, so the reflected light is horizontally polarized and the axis wants to be vertical in the frame.
+      That is also exactly the geometry used to calibrate the filter in Step 1.</p>
+    </div>
+  </div>
+  <div class="card">
+    <h1>What the phone contributes</h1>
+    <div class="note">
+      <p><b>GPS + clock</b> give the sun's azimuth and altitude from a standard solar position algorithm. Location
+      only needs to be right to a few kilometres; time needs to be right to about a minute.</p>
+      <p><b>Compass + tilt</b> give where the lens is pointed. This is the weak link: Android's rotation vector is
+      referenced to magnetic north, it drifts near metal, and the app has no way to read your declination — which
+      is why the shadow sight in Step 2 exists.</p>
+      <p><b>Roll</b> is the other input, and the app assumes a level horizon unless you tell it otherwise, since
+      that is how an M gets held most of the time.</p>
+    </div>
+  </div>
+  <div class="card">
+    <h1>Honest limits</h1>
+    <div class="note">
+      <p>Polarization angle varies across a wide frame. On a 35mm lens the correct angle can differ by several
+      degrees between the left and right edge, and on a 21mm by a lot more — plus wide skies show the
+      polarization band as an obvious dark patch. The app solves for the centre of the frame.</p>
+      <p>An error of ±10° in the ring costs you very little: transmitted intensity goes as cos²
+      of the error, so 10° off still removes 97% of what a perfect setting would.
+      ±20° still gets 88%. So do not agonise — this is a forgiving instrument.</p>
+      <p>The circular polarizer must face the right way. Engraved side toward the subject. Backwards, the
+      quarter-wave plate scrambles the light before it reaches the linear element and nothing works.</p>
+    </div>
+  </div>
+</div>
+
+<div class="tiny dim" style="text-align:center;padding:14px 0 4px">
+  Works offline · add to home screen
+</div>
+
+<script>
+"use strict";
+const D=Math.PI/180, R2D=180/Math.PI;
+const $=id=>document.getElementById(id);
+const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
+const mod=(a,n)=>((a%n)+n)%n;
+
+/* ═══════════ filter ring geometry, traced from the photograph ═══════════
+   ψ is measured in degrees clockwise from 12 o'clock, viewed from the FRONT
+   of the filter (the same view as the reference photo).                     */
+const WORDS=[
+  {t:"46",                    a:345.3, b:352.7},
+  {t:"KSM HTC-POL MRC nano",  a: 32.2, b:118.0},
+  {t:"MASTER",                a:152.3, b:179.5},
+  {t:"B+W MADE IN GERMANY",   a:214.6, b:304.8}
+];
+const WID={" ":0.55,"+":0.95,"-":0.5,"I":0.42,"J":0.62,"L":0.78,"M":1.32,"W":1.42,
+           "T":0.88,"4":0.92,"6":0.92,"a":0.78,"n":0.82,"o":0.82};
+const gw=c=>WID[c]!==undefined?WID[c]:(c===c.toLowerCase()&&c!==c.toUpperCase()?0.78:0.95);
+
+/* glyph table: every character with its ψ */
+const GLYPHS=[];
+for(const w of WORDS){
+  const span=mod(w.b-w.a,360);
+  const adv=[...w.t].map(gw);
+  const tot=adv.reduce((s,x)=>s+x,0);
+  let acc=0;
+  // which space-delimited token does each character belong to
+  const toks=[]; let cur="";
+  for(const ch of w.t){ if(ch===" "){toks.push(null);cur="";} else {toks.push(null);} }
+  {
+    let i=0;
+    for(const piece of w.t.split(" ")){
+      for(let k=0;k<piece.length;k++) toks[i++]=piece;
+      i++; // the space
+    }
+  }
+  for(let i=0;i<w.t.length;i++){
+    const psi=mod(w.a+span*(acc+adv[i]/2)/tot,360);
+    acc+=adv[i];
+    if(w.t[i]!==" ") GLYPHS.push({c:w.t[i],psi,word:w.t,tok:toks[i]||w.t,idx:i});
+  }
+}
+const SORTED=[...GLYPHS].sort((a,b)=>a.psi-b.psi);
+
+/* ═══════════ solar position (NOAA low-precision, ±0.01°) ═══════════ */
+function julianDay(dt){
+  let y=dt.getUTCFullYear(), mo=dt.getUTCMonth()+1;
+  const d=dt.getUTCDate();
+  const h=dt.getUTCHours()+dt.getUTCMinutes()/60+dt.getUTCSeconds()/3600;
+  if(mo<=2){y-=1;mo+=12;}
+  const A=Math.floor(y/100), B=2-A+Math.floor(A/4);
+  return Math.floor(365.25*(y+4716))+Math.floor(30.6001*(mo+1))+d+B-1524.5+h/24;
+}
+function sunPosition(dt,lat,lon){
+  const n=julianDay(dt)-2451545.0;
+  const L=mod(280.460+0.9856474*n,360);
+  const g=mod(357.528+0.9856003*n,360);
+  const lam=mod(L+1.915*Math.sin(g*D)+0.020*Math.sin(2*g*D),360);
+  const eps=23.439-0.0000004*n;
+  const ra=mod(Math.atan2(Math.cos(eps*D)*Math.sin(lam*D),Math.cos(lam*D))*R2D,360);
+  const dec=Math.asin(Math.sin(eps*D)*Math.sin(lam*D))*R2D;
+  const gmst=mod(18.697374558+24.06570982441908*n,24);
+  const lmst=mod(gmst*15+lon,360);
+  const H=mod(lmst-ra+540,360)-180;
+  let alt=Math.asin(Math.sin(lat*D)*Math.sin(dec*D)+
+          Math.cos(lat*D)*Math.cos(dec*D)*Math.cos(H*D))*R2D;
+  const az=mod(Math.atan2(-Math.sin(H*D)*Math.cos(dec*D)*Math.cos(lat*D),
+              Math.sin(dec*D)-Math.sin(alt*D)*Math.sin(lat*D))*R2D,360);
+  if(alt>-1){ // simple refraction lift near horizon
+    const t=alt+10.3/(alt+5.11);
+    alt+=(1.02/Math.tan(t*D))/60;
+  }
+  return {az,alt};
+}
+
+/* ═══════════ vectors, ENU (x=East, y=North, z=Up) ═══════════ */
+const dir=(az,el)=>[Math.cos(el*D)*Math.sin(az*D),Math.cos(el*D)*Math.cos(az*D),Math.sin(el*D)];
+const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
+const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
+const sub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]];
+const scl=(a,k)=>[a[0]*k,a[1]*k,a[2]*k];
+const len=a=>Math.hypot(a[0],a[1],a[2]);
+const norm=a=>{const L=len(a);return L<1e-12?[0,0,0]:scl(a,1/L);};
+
+/* ═══════════ state ═══════════ */
+const S={
+  psiT:null, off:0, dec:0, hand:1, handDone:false,
+  lat:null, lon:null, acc:null,
+  az:null, el:null, roll:null, absOK:false,
+  frozen:false, frame:"level",
+  aimSrc:"sensor", azSamples:[], manAz:0, manEl:0,
+  calPsi:0, ringShown:0
+};
+function save(){
+  localStorage.setItem("pf", JSON.stringify({
+    psiT:S.psiT, off:S.off, dec:S.dec, hand:S.hand, handDone:S.handDone,
+    lat:S.lat, lon:S.lon, frame:S.frame, azSamples:S.azSamples
+  }));
+}
+function load(){
+  try{
+    const o=JSON.parse(localStorage.getItem("pf")||"{}");
+    Object.assign(S,o);
+  }catch(e){}
+}
+load();
+
+/* ═══════════ ring drawing ═══════════ */
+const SVGNS="http://www.w3.org/2000/svg";
+function el(n,at){const e=document.createElementNS(SVGNS,n);
+  for(const k in at)e.setAttribute(k,at[k]);return e;}
+
+function drawRing(target,psiTop,opts){
+  opts=opts||{};
+  const mirror = false;   // always the front view, exactly as in the reference photo
+  target.textContent="";
+  const g=el("g",{});
+  target.appendChild(g);
+
+  // static body
+  const defs=el("defs",{});
+  defs.innerHTML=
+   '<radialGradient id="glass" cx="42%" cy="38%" r="72%">'+
+   '<stop offset="0%" stop-color="#12202a"/><stop offset="55%" stop-color="#060a0d"/>'+
+   '<stop offset="100%" stop-color="#0a1512"/></radialGradient>'+
+   '<linearGradient id="brass" x1="0" y1="0" x2="0" y2="1">'+
+   '<stop offset="0%" stop-color="#6b5a44"/><stop offset="45%" stop-color="#3c332a"/>'+
+   '<stop offset="100%" stop-color="#584a38"/></linearGradient>';
+  g.appendChild(defs);
+  g.appendChild(el("circle",{r:300,fill:"#0d1116",stroke:"#242c35","stroke-width":6}));
+  g.appendChild(el("circle",{r:272,fill:"url(#brass)"}));
+  g.appendChild(el("circle",{r:236,fill:"url(#glass)",stroke:"#0a0d10","stroke-width":3}));
+
+  // rotating engraving group
+  const rot=el("g",{});
+  const m = mirror ? "scale(-1,1) " : "";
+  rot.setAttribute("transform", m+"rotate("+(mirror? psiTop : -psiTop)+")");
+  g.appendChild(rot);
+
+  for(const G of GLYPHS){
+    const t=el("text",{
+      x:0,y:0,fill:"#e8c98a","font-size":26,"font-weight":700,
+      "font-family":'ui-sans-serif,system-ui,"Segoe UI",Roboto,sans-serif',
+      "text-anchor":"middle","dominant-baseline":"central",
+      transform:"rotate("+G.psi+") translate(0,-254)"+(mirror?" scale(-1,1)":"")
+    });
+    t.textContent=G.c;
+    rot.appendChild(t);
+  }
+  // small index notch on the ring itself at ψ = ψT (the transmission axis)
+  if(S.psiT!==null && !opts.noAxis){
+    for(const s of [0,180]){
+      const a=mod(S.psiT+s,360);
+      rot.appendChild(el("line",{
+        x1:0,y1:-286,x2:0,y2:-274,stroke:"#22d3ee","stroke-width":4,
+        "stroke-linecap":"round",transform:"rotate("+a+")"}));
+    }
+  }
+
+  // fixed 12 o'clock index
+  g.appendChild(el("path",{d:"M0,-296 L14,-322 L-14,-322 Z",fill:"#ff4d4d"}));
+  g.appendChild(el("line",{x1:0,y1:-300,x2:0,y2:-240,stroke:"#ff4d4d",
+    "stroke-width":4,"stroke-linecap":"round"}));
+  const lbl=el("text",{x:0,y:-336,fill:"#ff4d4d","font-size":22,"font-weight":700,
+    "text-anchor":"middle","font-family":'ui-sans-serif,system-ui,sans-serif'});
+  lbl.textContent="TOP";
+  g.appendChild(lbl);
+  target.setAttribute("viewBox","-330 -352 660 700");
+}
+
+/* ═══════════ describe a ring position in words ═══════════ */
+/* Described without "clockwise" or "left/right", which flip depending on whether
+   you are looking at the front of the lens or down at it from behind the camera.
+   Bracketing two letters is unambiguous from any angle. */
+function describe(psiTop){
+  const n=SORTED.length;
+  let ni=SORTED.findIndex(g=>g.psi>=psiTop);
+  if(ni<0) ni=0;
+  const A=SORTED[(ni-1+n)%n], B=SORTED[ni];
+  const dA=mod(psiTop-A.psi,360), dB=mod(B.psi-psiTop,360);
+  if(Math.min(dA,dB)<2.0){
+    const N = dA<=dB? A : B;
+    return {main:"“"+N.c+"” of "+N.tok, sub:"at the top of the lens"};
+  }
+  const pct=Math.round(100*dA/(dA+dB));
+  return {
+    main:"between “"+A.c+"” and “"+B.c+"”"+(A.tok===B.tok? " of "+A.tok :
+         "  ("+A.tok+" → "+B.tok+")"),
+    sub:pct+"% of the way across — "+dA.toFixed(0)+"° past “"+A.c+"”, "+
+        dB.toFixed(0)+"° short of “"+B.c+"”"
+  };
+}
+
+/* ═══════════ core solve ═══════════ */
+function solve(){
+  const now=new Date();
+  const lat=S.lat, lon=S.lon;
+  let camAz, camEl;
+  if(S.aimSrc==="manual"){ camAz=S.manAz; camEl=S.manEl; }
+  else { camAz=S.az; camEl=S.el; }
+  if(camAz===null||camAz===undefined||lat===null) return null;
+
+  const offset = S.azSamples.length? S.off : S.dec;
+  camAz = mod(camAz + offset, 360);
+
+  const sp=sunPosition(now,lat,lon);
+  const s=dir(sp.az,sp.alt);
+  const v=dir(camAz,camEl);
+
+  // camera up vector
+  let u;
+  if(S.frame==="phone" && S.roll!==null){
+    u=norm(sub(S.roll, scl(v,dot(S.roll,v))));
+    if(len(u)<1e-6) u=[0,0,1];
+  } else {
+    const z=[0,0,1];
+    u=norm(sub(z,scl(v,dot(z,v))));
+    if(len(u)<1e-6) u=[0,1,0];
+    if(S.frame==="port") u=norm(cross(v,u)); // rotate 90° -> portrait
+  }
+  const r=norm(cross(v,u));
+
+  const cosg=clamp(dot(s,v),-1,1);
+  const gamma=Math.acos(cosg)*R2D;
+
+  // transmission axis = sun projected into image plane
+  const tv=sub(s,scl(v,cosg));
+  const weak=len(tv)<1e-4;
+  const t=norm(tv);
+  const theta=mod(Math.atan2(dot(t,r),dot(t,u))*R2D,180); // clockwise from up, mod 180
+
+  const Pmax=0.75, sg=Math.sin(gamma*D);
+  const P=Pmax*sg*sg/(1+cosg*cosg);
+  const ratio=(1+P)/(1-P);
+
+  let psiTop=null;
+  if(S.psiT!==null) psiTop=mod(S.psiT + S.hand*theta, 180);
+
+  return {sp,camAz,camEl,gamma,theta,P,ratio,psiTop,weak,sunUp:sp.alt>-0.9};
+}
+
+/* ═══════════ render ═══════════ */
+let lastSolve=null;
+function render(){
+  if(S.frozen && lastSolve){ paint(lastSolve); return; }
+  const R=solve();
+  lastSolve=R;
+  paint(R);
+}
+function paint(R){
+  $("kTime").textContent=new Date().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit",second:"2-digit"});
+  $("kPos").textContent = S.lat===null? "no fix" :
+     S.lat.toFixed(3)+"°, "+S.lon.toFixed(3)+"°"+(S.acc?" ±"+Math.round(S.acc)+"m":"");
+  if(!R){
+    $("instr").textContent = S.lat===null? "Need a GPS fix" : "Need a compass reading";
+    $("instr2").textContent = S.lat===null? "Tap Use GPS in Calibrate, or type a location."
+                                          : "Tap Enable sensors.";
+    $("instr3").textContent="";
+    drawRing($("ring"), S.ringShown);
+    return;
+  }
+  $("kSun").textContent=R.sp.az.toFixed(1)+"° / "+R.sp.alt.toFixed(1)+"°";
+  $("kCam").textContent=R.camAz.toFixed(1)+"° / "+R.camEl.toFixed(1)+"°";
+  $("kGamma").textContent=R.gamma.toFixed(1)+"°";
+  $("kTheta").textContent=R.theta.toFixed(1)+"°";
+  $("kRatio").textContent=R.ratio.toFixed(1)+"×";
+  const pct=Math.round(R.P*100);
+  $("dopBar").style.width=pct+"%";
+  const pill=$("dopPill");
+  pill.textContent=pct+"%";
+  pill.className="pill "+(pct>50?"ok":pct>25?"warn":"bad");
+
+  let note;
+  if(!R.sunUp) note="The sun is below the horizon — sky polarization is weak and unpredictable at twilight.";
+  else if(R.gamma<25) note="You are shooting almost into the sun. There is very little to polarize; the filter will mostly just cost you 1⅔ stops.";
+  else if(R.gamma>155) note="The sun is almost directly behind you. Same story — little polarization to remove.";
+  else if(pct>55) note="Strong. This is close to the 90° band where sky polarization peaks.";
+  else if(R.gamma>40&&R.gamma<120) note="Moderate for sky, but this range is still good for cutting sheen off foliage and paint.";
+  else note="Weak. Expect a subtle effect.";
+  $("dopNote").textContent=note;
+
+  if(S.psiT===null){
+    $("instr").textContent="Filter not calibrated yet";
+    $("instr2").textContent="Do Step 1 on the Calibrate tab — five minutes, no sun needed.";
+    $("instr3").textContent="Meanwhile: the axis should sit at "+R.theta.toFixed(0)+
+      "° clockwise from vertical in your frame.";
+    drawRing($("ring"), S.ringShown);
+    return;
+  }
+  if(R.weak){
+    $("instr").textContent="Angle does not matter here";
+    $("instr2").textContent="You are pointed straight at or straight away from the sun.";
+    $("instr3").textContent="";
+  } else {
+    // the axis is a line, so ψ and ψ+180 are equally correct.
+    // Show whichever one lands closer to a letter — easier to set by eye.
+    const p1=R.psiTop, p2=mod(R.psiTop+180,360);
+    const near=p=>{let m=999;for(const G of GLYPHS)
+      m=Math.min(m,Math.abs(mod(G.psi-p+180,360)-180));return m;};
+    const pick = near(p2)<near(p1)-1 ? p2 : p1;
+    const d1=describe(pick), d2=describe(mod(pick+180,360));
+    $("instr").textContent=d1.main;
+    $("instr2").textContent=d1.sub+"   ·   ring angle "+pick.toFixed(1)+"°";
+    $("instr3").textContent="Or 180° away, identical effect: "+d2.main;
+    R.psiTop=pick;
+  }
+  S.ringShown=R.psiTop;
+  drawRing($("ring"), R.psiTop);
+
+  // handedness helper
+  $("hdGeo").textContent = (R.sp.alt>15 && R.gamma>35 && R.gamma<75) ? "good now" : "wait for better";
+  $("hdGeo").className="pill "+((R.sp.alt>15&&R.gamma>35&&R.gamma<75)?"ok":"warn");
+  if(S.psiT!==null){
+    const A=mod(S.psiT+S.hand*R.theta,180), B=mod(S.psiT-S.hand*R.theta,180);
+    $("hdA").textContent=describe(A).main+"  ("+A.toFixed(0)+"°)";
+    $("hdB").textContent=describe(B).main+"  ("+B.toFixed(0)+"°)";
+  }
+}
+
+/* ═══════════ sensors ═══════════ */
+function orientMatrix(a,b,c){
+  const cA=Math.cos(a*D),sA=Math.sin(a*D),cB=Math.cos(b*D),sB=Math.sin(b*D),
+        cC=Math.cos(c*D),sC=Math.sin(c*D);
+  // W3C: R = Rz(alpha) Rx(beta) Ry(gamma); columns are device axes in world (ENU)
+  return {
+    x:[cA*cC-sA*sB*sC, cC*sA+cA*sB*sC, -cB*sC],
+    y:[-cB*sA,         cA*cB,           sB   ],
+    z:[cA*sC+cC*sA*sB, sA*sC-cA*cC*sB,  cB*cC]
+  };
+}
+function onOrient(e){
+  if(e.alpha===null) return;
+  S.absOK = e.absolute===true || S.absOK;
+  const M=orientMatrix(e.alpha,e.beta,e.gamma);
+  const v=scl(M.z,-1);                       // rear camera looks along -z
+  S.az=mod(Math.atan2(v[0],v[1])*R2D,360);
+  S.el=Math.asin(clamp(v[2],-1,1))*R2D;
+  S.roll=M.y;                                // device "up" in world
+  const p=$("sensorPill");
+  p.textContent = S.absOK? "compass live" : "relative only";
+  p.className="pill "+(S.absOK?"ok":"warn");
+}
+async function startSensors(){
+  try{
+    if(typeof DeviceOrientationEvent!=="undefined" &&
+       typeof DeviceOrientationEvent.requestPermission==="function"){
+      const r=await DeviceOrientationEvent.requestPermission();
+      if(r!=="granted"){alert("Motion permission denied.");return;}
+    }
+  }catch(e){}
+  window.addEventListener("deviceorientationabsolute",onOrient,true);
+  window.addEventListener("deviceorientation",onOrient,true);
+  getGeo();
+  try{ if("wakeLock" in navigator) await navigator.wakeLock.request("screen"); }catch(e){}
+  setTimeout(()=>{
+    if(S.az===null){
+      $("sensorPill").textContent="no sensor data";
+      $("sensorPill").className="pill bad";
+    } else if(!S.absOK){
+      $("sensorPill").textContent="relative only";
+      $("sensorPill").className="pill warn";
+    }
+  },2500);
+}
+function getGeo(){
+  if(!navigator.geolocation) return;
+  navigator.geolocation.watchPosition(p=>{
+    S.lat=p.coords.latitude; S.lon=p.coords.longitude; S.acc=p.coords.accuracy;
+    $("inLat").value=S.lat.toFixed(5); $("inLon").value=S.lon.toFixed(5);
+    save();
+  },()=>{},{enableHighAccuracy:false,maximumAge:120000,timeout:15000});
+}
+
+/* ═══════════ calibration dial ═══════════ */
+function drawCal(){
+  drawRing($("calRing"), S.calPsi, {forceFront:true,noAxis:true});
+  const d=describe(S.calPsi);
+  $("psiReadout").textContent="At the top: "+d.main+"   ·   ψ = "+S.calPsi.toFixed(1)+"°";
+  $("inPsiT").value=S.calPsi.toFixed(1);
+}
+(function dialDrag(){
+  const sv=$("calRing"); let on=false,last=0;
+  const ang=ev=>{
+    const r=sv.getBoundingClientRect();
+    const p=ev.touches?ev.touches[0]:ev;
+    const x=p.clientX-(r.left+r.width/2), y=p.clientY-(r.top+r.height*0.48);
+    return mod(Math.atan2(x,-y)*R2D,360);
+  };
+  const dn=e=>{on=true;last=ang(e);e.preventDefault();};
+  const mv=e=>{ if(!on)return; const a=ang(e);
+    S.calPsi=mod(S.calPsi-(mod(a-last+180,360)-180),360); last=a; drawCal(); e.preventDefault(); };
+  const up=()=>{on=false;};
+  sv.addEventListener("touchstart",dn,{passive:false});
+  sv.addEventListener("touchmove",mv,{passive:false});
+  sv.addEventListener("touchend",up);
+  sv.addEventListener("mousedown",dn); window.addEventListener("mousemove",mv);
+  window.addEventListener("mouseup",up);
+})();
+
+/* ═══════════ UI wiring ═══════════ */
+function tab(n){
+  for(const [b,p] of [["tabAim","paneAim"],["tabCal","paneCal"],["tabHelp","paneHelp"]]){
+    const act=(b==="tab"+n);
+    $(b).classList.toggle("on",act);
+    $(p).classList.toggle("hide",!act);
+  }
+  if(n==="Cal") drawCal();
+}
+$("tabAim").onclick=()=>tab("Aim");
+$("tabCal").onclick=()=>tab("Cal");
+$("tabHelp").onclick=()=>tab("Help");
+
+$("btnStart").onclick=startSensors;
+$("btnFreeze").onclick=()=>{
+  S.frozen=!S.frozen;
+  $("btnFreeze").textContent=S.frozen?"Live again":"Hold reading";
+  $("btnFreeze").classList.toggle("hot",S.frozen);
+  $("ringCard").classList.toggle("frozen",S.frozen);
+};
+$("selFrame").onchange=e=>{S.frame=e.target.value;save();};
+$("selAim").onchange=e=>{S.aimSrc=e.target.value;$("manualBox").classList.toggle("hide",S.aimSrc!=="manual");};
+$("inAz").oninput=e=>{S.manAz=parseFloat(e.target.value)||0;};
+$("inEl").oninput=e=>{S.manEl=parseFloat(e.target.value)||0;};
+
+$("btnSavePsi").onclick=()=>{
+  const v=parseFloat($("inPsiT").value);
+  if(isNaN(v)){alert("Enter a number.");return;}
+  S.psiT=mod(v,360); S.calPsi=S.psiT; save(); status(); drawCal();
+  alert("Saved. ψT = "+S.psiT.toFixed(1)+"°");
+};
+$("inPsiT").onchange=e=>{const v=parseFloat(e.target.value); if(!isNaN(v)){S.calPsi=mod(v,360);drawCal();}};
+
+$("btnCapAz").onclick=()=>{
+  if(S.az===null){alert("No compass reading yet — tap Enable sensors first.");return;}
+  if(S.lat===null){alert("No GPS fix yet.");return;}
+  const sp=sunPosition(new Date(),S.lat,S.lon);
+  if(sp.alt<3){alert("The sun is too low (or down) for a reliable sight.");return;}
+  const d=mod(sp.az-S.az+180,360)-180;
+  S.azSamples.push(+d.toFixed(2));
+  S.off=+(S.azSamples.reduce((a,b)=>a+b,0)/S.azSamples.length).toFixed(2);
+  $("calSunAz").textContent=sp.az.toFixed(1)+"°";
+  $("calRawAz").textContent=S.az.toFixed(1)+"°";
+  save(); status();
+};
+$("btnClrAz").onclick=()=>{S.azSamples=[];S.off=0;save();status();};
+$("btnHandA").onclick=()=>{S.handDone=true;save();status();alert("Kept current handedness.");};
+$("btnHandB").onclick=()=>{S.hand=-S.hand;S.handDone=true;save();status();
+  alert("Handedness flipped and saved.");};
+$("inOff").onchange=e=>{S.off=parseFloat(e.target.value)||0;save();status();};
+$("inDec").onchange=e=>{S.dec=parseFloat(e.target.value)||0;save();};
+$("inLat").onchange=e=>{S.lat=parseFloat(e.target.value);save();};
+$("inLon").onchange=e=>{S.lon=parseFloat(e.target.value);save();};
+$("btnGeo").onclick=getGeo;
+$("btnReset").onclick=()=>{if(confirm("Erase all calibration?")){localStorage.removeItem("pf");location.reload();}};
+
+function status(){
+  const a=$("stA"),b=$("stB"),c=$("stC");
+  a.textContent=S.psiT===null?"not set":"ψT = "+S.psiT.toFixed(1)+"°";
+  a.className="pill "+(S.psiT===null?"bad":"ok");
+  b.textContent=S.azSamples.length? S.off.toFixed(1)+"° ("+S.azSamples.length+" sights)":"not set";
+  b.className="pill "+(S.azSamples.length?"ok":"warn");
+  c.textContent=S.handDone?"confirmed":"not done";
+  c.className="pill "+(S.handDone?"ok":"warn");
+  $("calOff").textContent=S.off.toFixed(1)+"°";
+  $("azSamples").textContent=S.azSamples.length?("sights: "+S.azSamples.map(x=>x.toFixed(1)+"°").join(", ")):"";
+  $("inOff").value=S.off; $("inDec").value=S.dec;
+  if(S.lat!==null){$("inLat").value=S.lat.toFixed(5);$("inLon").value=S.lon.toFixed(5);}
+}
+
+/* boot */
+$("selFrame").value=S.frame;
+if(S.psiT!==null) S.calPsi=S.psiT;
+status(); drawCal(); render();
+setInterval(render,250);
+if("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(()=>{});
+</script>
+</body>
+</html>
