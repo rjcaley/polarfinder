@@ -184,9 +184,11 @@ hr{border:0;border-top:1px solid var(--line);margin:12px 0}
 
   <div class="card">
     <h1>Step 2 · Compass offset (shadow sight)</h1>
-    <div class="note">Phone magnetometers read magnetic north, drift near the brass and steel of an M-body, and
-      Chrome does not tell us your magnetic declination. One sun sight fixes all three at once.
-      <b>Redo this if you travel a long way or the readings look wrong.</b> Never sight the sun by eye.</div>
+    <div class="note">Phone magnetometers read <b>magnetic</b> north and Chrome never tells us your
+      declination, so every heading is wrong by the same fixed amount. One sun sight removes it.
+      <br><br><b>Take this sight with the M well away from the phone</b> — set down, or at arm's
+      length. Camera iron is a different kind of error and must not be baked in here; Step 2b
+      explains why and measures how much yours matters. Never sight the sun by eye.</div>
     <ol class="steps">
       <li>Pick a sunny moment and a flat patch of ground. Stand something upright on it —
         <b>the taller the better</b>. A fence post or ski pole beats a pen by a factor of seven,
@@ -211,6 +213,28 @@ hr{border:0;border-top:1px solid var(--line);margin:12px 0}
       <button id="btnClrAz">Clear</button>
     </div>
     <div class="tiny dim" style="margin-top:6px" id="azSamples"></div>
+  </div>
+
+  <div class="card">
+    <h1>Step 2b · Interference check</h1>
+    <div class="note">Take the shadow sight with <b>the M well away from the phone</b> — at arm's
+      length, hanging on the strap, or set down. Camera iron does <b>not</b> produce a constant
+      offset; it produces an error that swings through zero as you turn, so subtracting a single
+      number can double your worst case rather than fix it. Declination is a true constant, and
+      that is all Step 2 should be removing.
+      <br><br>This tool measures how much your body and camera actually matter. Aim at a distant
+      fixed landmark and don't move your feet.</div>
+    <div class="kv"><span class="dim">Live raw compass</span><b id="ifLive" class="mono">—</b></div>
+    <div class="row" style="margin-top:8px">
+      <button id="btnIfA" class="grow sm">A · camera away</button>
+      <button id="btnIfB" class="grow sm">B · camera in position</button>
+    </div>
+    <div class="kv" style="margin-top:6px"><span class="dim">A</span><b id="ifA" class="mono">—</b></div>
+    <div class="kv"><span class="dim">B</span><b id="ifB" class="mono">—</b></div>
+    <div class="kv"><span class="dim">Difference</span><b id="ifD" class="mono">—</b></div>
+    <div class="tiny dim" id="ifNote" style="margin-top:6px">Repeat facing three or four different
+      directions. If the difference stays under about 3° everywhere, the camera is irrelevant and you
+      can hold it however you like.</div>
   </div>
 
   <div class="card">
@@ -576,6 +600,7 @@ function render(){
 }
 function paint(R){
   $("kTime").textContent=new Date().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit",second:"2-digit"});
+  $("ifLive").textContent = S.az===null? "—" : S.az.toFixed(1)+"°";
   $("kPos").textContent = S.lat===null? "no fix" :
      S.lat.toFixed(3)+"°, "+S.lon.toFixed(3)+"°"+(S.acc?" ±"+Math.round(S.acc)+"m":"");
   if(!R){
@@ -774,6 +799,28 @@ $("btnCapAz").onclick=()=>{
   save(); status();
 };
 $("btnClrAz").onclick=()=>{S.azSamples=[];S.off=0;save();status();};
+
+/* interference check */
+let ifA=null, ifB=null;
+function ifPaint(){
+  $("ifA").textContent = ifA===null? "—" : ifA.toFixed(1)+"°";
+  $("ifB").textContent = ifB===null? "—" : ifB.toFixed(1)+"°";
+  if(ifA===null||ifB===null){ $("ifD").textContent="—"; return; }
+  const d=mod(ifB-ifA+180,360)-180;
+  $("ifD").textContent=(d>=0?"+":"")+d.toFixed(1)+"°";
+  const a=Math.abs(d);
+  $("ifNote").textContent = a<3
+    ? "Under 3° — the camera is not meaningfully disturbing the compass. Hold it however you like."
+    : a<8
+    ? a.toFixed(0)+"° — noticeable. Keep the M at arm's length while you take the reading, then use "+
+      "Hold reading and go to the lens."
+    : a.toFixed(0)+"° — large. Take every reading with the camera set down or fully at arm's length; "+
+      "at this level it would swamp everything else.";
+}
+$("btnIfA").onclick=()=>{ if(S.az===null){alert("No compass reading yet.");return;}
+  ifA=S.az; ifPaint(); };
+$("btnIfB").onclick=()=>{ if(S.az===null){alert("No compass reading yet.");return;}
+  ifB=S.az; ifPaint(); };
 $("btnHandA").onclick=()=>{S.handDone=true;save();status();alert("Kept current handedness.");};
 $("btnHandB").onclick=()=>{S.hand=-S.hand;S.handDone=true;save();status();
   alert("Handedness flipped and saved.");};
