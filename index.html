@@ -188,12 +188,21 @@ hr{border:0;border-top:1px solid var(--line);margin:12px 0}
       Chrome does not tell us your magnetic declination. One sun sight fixes all three at once.
       <b>Redo this if you travel a long way or the readings look wrong.</b> Never sight the sun by eye.</div>
     <ol class="steps">
-      <li>Pick a sunny moment and a flat patch of ground. Stand a pen, bottle or post upright on it.</li>
+      <li>Pick a sunny moment and a flat patch of ground. Stand something upright on it —
+        <b>the taller the better</b>. A fence post or ski pole beats a pen by a factor of seven,
+        because your aiming error shrinks in proportion to the shadow's length.</li>
       <li>The shadow points directly away from the sun. Stand at the <b>tip of the shadow</b>.</li>
       <li>Hold the phone upright, screen toward you, and aim its back squarely along the shadow
         <b>toward the object</b> — that is, toward the sun, but keep your eyes on the screen.</li>
       <li>Hold steady and tap Capture. Do it three or four times and the app will average them.</li>
     </ol>
+    <div class="note"><b>Season does not matter.</b> This measures your compass's error, not the
+      sun's position — the app already knows where the sun is at that instant. A winter shadow and a
+      summer shadow point different ways, and both give the same offset. What does matter is the
+      sun's <b>height</b>: with it 15–35° up the shadow is long and the sun's azimuth is drifting
+      slowly, so the sight is easy to take well. Above about 55° the shadow gets so short that a
+      2cm placement error becomes 10°+ of azimuth error. Redo the calibration if you change phone
+      case, camera bag or phone — hard iron near the phone matters far more than geography.</div>
     <div class="kv"><span class="dim">Computed sun azimuth</span><b id="calSunAz" class="mono">—</b></div>
     <div class="kv"><span class="dim">Raw compass azimuth</span><b id="calRawAz" class="mono">—</b></div>
     <div class="kv"><span class="dim">Stored offset</span><b id="calOff" class="mono">0.0°</b></div>
@@ -753,6 +762,10 @@ $("btnCapAz").onclick=()=>{
   if(S.lat===null){alert("No GPS fix yet.");return;}
   const sp=sunPosition(new Date(),S.lat,S.lon);
   if(sp.alt<3){alert("The sun is too low (or down) for a reliable sight.");return;}
+  if(sp.alt>55 && !confirm("The sun is "+sp.alt.toFixed(0)+"° up. The shadow is short, so its "+
+     "direction is hard to judge, and near midday the sun's azimuth swings quickly.\n\n"+
+     "A sight in the morning or late afternoon (sun 15–45° up) is worth several of these.\n\n"+
+     "Capture anyway?")) return;
   const d=mod(sp.az-S.az+180,360)-180;
   S.azSamples.push(+d.toFixed(2));
   S.off=+(S.azSamples.reduce((a,b)=>a+b,0)/S.azSamples.length).toFixed(2);
@@ -780,7 +793,13 @@ function status(){
   c.textContent=S.handDone?"confirmed":"not done";
   c.className="pill "+(S.handDone?"ok":"warn");
   $("calOff").textContent=S.off.toFixed(1)+"°";
-  $("azSamples").textContent=S.azSamples.length?("sights: "+S.azSamples.map(x=>x.toFixed(1)+"°").join(", ")):"";
+  if(S.azSamples.length){
+    const a=S.azSamples, m=a.reduce((x,y)=>x+y,0)/a.length;
+    const sd=a.length>1? Math.sqrt(a.reduce((s,x)=>s+(x-m)*(x-m),0)/(a.length-1)) : 0;
+    $("azSamples").textContent="sights: "+a.map(x=>x.toFixed(1)+"°").join(", ")+
+      (a.length>1? "   ·   spread ±"+sd.toFixed(1)+"°"+
+        (sd>6?" — inconsistent, consider clearing and redoing":"") : "");
+  } else $("azSamples").textContent="";
   $("inOff").value=S.off; $("inDec").value=S.dec;
   if(S.lat!==null){$("inLat").value=S.lat.toFixed(5);$("inLon").value=S.lon.toFixed(5);}
 }
