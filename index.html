@@ -148,10 +148,12 @@ hr{border:0;border-top:1px solid var(--line);margin:12px 0}
   <div class="card">
     <div class="row"><div class="grow" style="font-weight:700">Status</div></div>
     <div class="kv"><span class="dim">Step 1 · Filter axis ψ<sub>T</sub></span><span id="stA" class="pill bad">not set</span></div>
-    <div class="kv"><span class="dim">Step 2 · Compass offset</span><span id="stB" class="pill bad">not set</span></div>
-    <div class="kv"><span class="dim">Step 3 · Handedness check</span><span id="stC" class="pill bad">not done</span></div>
-    <div class="tiny dim" style="margin-top:8px">Do these in order, whenever you have time. Everything is saved on this phone.
-      The app is usable after Step 1 alone; Steps 2 and 3 tighten it up.</div>
+    <div class="kv"><span class="dim">Step 2 · Handedness</span><span id="stC" class="pill bad">not done</span></div>
+    <div class="kv"><span class="dim">Declination (automatic)</span><span id="stDec" class="pill">needs GPS</span></div>
+    <div class="kv"><span class="dim">North reference check</span><span id="stB" class="pill warn">assumed</span></div>
+    <div class="tiny dim" style="margin-top:8px">Steps 1 and 2 are done together, in one five-minute session
+      at a puddle or a glass tabletop. Neither needs the sun, a compass, or a GPS fix. Declination is now
+      computed automatically from your location and follows you as you travel.</div>
   </div>
 
   <div class="card">
@@ -183,47 +185,74 @@ hr{border:0;border-top:1px solid var(--line);margin:12px 0}
   </div>
 
   <div class="card">
-    <h1>Step 2 · Compass offset (shadow sight)</h1>
-    <div class="note">Phone magnetometers read <b>magnetic</b> north and Chrome never tells us your
-      declination, so every heading is wrong by the same fixed amount. One sun sight removes it.
-      <br><br><b>Take this sight with the M well away from the phone</b> — set down, or at arm's
-      length. Camera iron is a different kind of error and must not be baked in here; Step 2b
-      explains why and measures how much yours matters. Never sight the sun by eye.</div>
+    <h1>Step 2 · Handedness (do this right after Step 1)</h1>
+    <div class="note">There are two mirror-image ways the ring's rotation could map onto the world, and
+      Step 1 cannot tell them apart because its geometry is symmetric. This settles it in thirty
+      seconds, <b>at the same reflection, with no sun, no compass and no GPS</b>.</div>
     <ol class="steps">
-      <li>Pick a sunny moment and a flat patch of ground. Stand something upright on it —
-        <b>the taller the better</b>. A fence post or ski pole beats a pen by a factor of seven,
-        because your aiming error shrinks in proportion to the shadow's length.</li>
-      <li>The shadow points directly away from the sun. Stand at the <b>tip of the shadow</b>.</li>
-      <li>Hold the phone upright, screen toward you, and aim its back squarely along the shadow
-        <b>toward the object</b> — that is, toward the sun, but keep your eyes on the screen.</li>
-      <li>Hold steady and tap Capture. Do it three or four times and the app will average them.</li>
+      <li>Go back to the darkest position you just found in Step 1, looking at the same reflection.</li>
+      <li>Now <b>tilt your head 45° to the right</b> — right ear toward right shoulder — still looking
+        at the reflection.</li>
+      <li>Re-find the darkest position by rotating the filter, and read the marking now at the top.</li>
+      <li>Tap whichever of the two below matches what you found.</li>
     </ol>
-    <div class="note"><b>Season does not matter.</b> This measures your compass's error, not the
-      sun's position — the app already knows where the sun is at that instant. A winter shadow and a
-      summer shadow point different ways, and both give the same offset. What does matter is the
-      sun's <b>height</b>: with it 15–35° up the shadow is long and the sun's azimuth is drifting
-      slowly, so the sight is easy to take well. Above about 55° the shadow gets so short that a
-      2cm placement error becomes 10°+ of azimuth error. Redo the calibration if you change phone
-      case, camera bag or phone — hard iron near the phone matters far more than geography.</div>
-    <div class="kv"><span class="dim">Computed sun azimuth</span><b id="calSunAz" class="mono">—</b></div>
-    <div class="kv"><span class="dim">Raw compass azimuth</span><b id="calRawAz" class="mono">—</b></div>
-    <div class="kv"><span class="dim">Stored offset</span><b id="calOff" class="mono">0.0°</b></div>
+    <div class="kv"><span class="dim">If handedness is as assumed</span><b id="hdA" class="mono">—</b></div>
+    <div class="kv"><span class="dim">If it is mirrored</span><b id="hdB" class="mono">—</b></div>
     <div class="row" style="margin-top:8px">
-      <button id="btnCapAz" class="pri grow">Capture sight</button>
-      <button id="btnClrAz">Clear</button>
+      <button id="btnHandA" class="grow sm">Top matched the first</button>
+      <button id="btnHandB" class="grow sm">Top matched the second</button>
     </div>
-    <div class="tiny dim" style="margin-top:6px" id="azSamples"></div>
+    <div class="tiny dim" style="margin-top:6px" id="handNote">The two candidates sit 90° apart on the
+      ring, so there is no way to mistake one for the other. The tilt does not need to be an accurate
+      45° — anything from 20° to 60° separates them clearly.</div>
   </div>
 
   <div class="card">
-    <h1>Step 2b · Interference check</h1>
-    <div class="note">Take the shadow sight with <b>the M well away from the phone</b> — at arm's
-      length, hanging on the strap, or set down. Camera iron does <b>not</b> produce a constant
-      offset; it produces an error that swings through zero as you turn, so subtracting a single
-      number can double your worst case rather than fix it. Declination is a true constant, and
-      that is all Step 2 should be removing.
-      <br><br>This tool measures how much your body and camera actually matter. Aim at a distant
-      fixed landmark and don't move your feet.</div>
+    <h1>Declination · automatic, nothing to do</h1>
+    <div class="note">The app carries the <b>World Magnetic Model 2025</b>, the NOAA/BGS model that
+      ships in aircraft and marine navigation systems. It computes the magnetic-to-true north
+      correction for wherever you are standing, to about 0.4°, and recomputes it as you move.
+      <b>Travel changes nothing and there is no calibration to redo.</b> The model is valid through
+      December 2029.</div>
+    <div class="kv"><span class="dim">Your position</span><b id="decPos" class="mono">—</b></div>
+    <div class="kv"><span class="dim">Declination here, now</span><b id="decVal" class="mono">—</b></div>
+    <div class="kv"><span class="dim">Horizontal field strength</span><b id="decH" class="mono">—</b></div>
+    <div class="tiny dim" id="decNote" style="margin-top:6px"></div>
+  </div>
+
+  <div class="card">
+    <h1>Optional · North reference check (one time, ever)</h1>
+    <div class="note">Chrome on Android reports headings from Android's rotation-vector sensor, which is
+      referenced to <b>magnetic</b> north — so the app applies the declination above. Some Android
+      layers hand back true north already, in which case it should not. This is a property of your
+      phone and browser, not your location, so checking it once settles it permanently.
+      <br><br>The check uses <b>GPS course over ground</b>, which comes from satellites and knows
+      nothing about magnetism. No sun, no flat ground, no straight objects — just walk.</div>
+    <ol class="steps">
+      <li>Get outside with a clear sky view and a straight run of at least 50 m — a path, a quiet
+        pavement, an empty car park.</li>
+      <li>Hold the phone in front of you, screen toward you, <b>back facing the way you will walk</b>.</li>
+      <li>Tap Start, walk straight at a normal pace for about 30 seconds, then tap Stop.</li>
+    </ol>
+    <div class="kv"><span class="dim">Distance walked</span><b id="wkDist" class="mono">—</b></div>
+    <div class="kv"><span class="dim">GPS course (true north)</span><b id="wkGps" class="mono">—</b></div>
+    <div class="kv"><span class="dim">Compass heading (averaged)</span><b id="wkMag" class="mono">—</b></div>
+    <div class="kv"><span class="dim">Measured difference</span><b id="wkDiff" class="mono">—</b></div>
+    <div class="kv"><span class="dim">Verdict</span><span id="wkVerdict" class="pill">—</span></div>
+    <div class="row" style="margin-top:8px">
+      <button id="btnWalk" class="pri grow">Start walk</button>
+      <button id="btnWalkClr">Clear</button>
+    </div>
+    <div class="tiny dim" style="margin-top:6px" id="wkNote">Until you run this, the app assumes magnetic
+      north, which is almost certainly right for Chrome on Android.</div>
+  </div>
+
+  <div class="card">
+    <h1>Optional · Camera interference check</h1>
+    <div class="note">Camera iron does <b>not</b> produce a constant offset; it produces an error that
+      swings through zero as you turn, so it cannot be calibrated away with a single number — it has to
+      be avoided by keeping the M away from the phone while you take the reading. This measures how
+      much yours actually matters. Aim at a distant fixed landmark and don't move your feet.</div>
     <div class="kv"><span class="dim">Live raw compass</span><b id="ifLive" class="mono">—</b></div>
     <div class="row" style="margin-top:8px">
       <button id="btnIfA" class="grow sm">A · camera away</button>
@@ -238,34 +267,19 @@ hr{border:0;border-top:1px solid var(--line);margin:12px 0}
   </div>
 
   <div class="card">
-    <h1>Step 3 · Handedness check</h1>
-    <div class="note">There are two ways the ring's rotation could map onto the sky, and they differ by a mirror.
-      Step 1 cannot tell them apart. This test can. You need the sun <b>roughly 45° off to one side</b> of
-      what you are photographing and <b>well above the horizon</b> — mid-morning or mid-afternoon, aimed at
-      blue sky. The app will tell you when the geometry is good.</div>
-    <div class="kv"><span class="dim">Geometry right now</span><span id="hdGeo" class="pill">—</span></div>
-    <div class="kv"><span class="dim">Setting A (current)</span><b id="hdA" class="mono">—</b></div>
-    <div class="kv"><span class="dim">Setting B (mirrored)</span><b id="hdB" class="mono">—</b></div>
-    <ol class="steps" style="margin-top:8px">
-      <li>Aim at open blue sky, hold the reading, then set the ring to <b>Setting A</b> and look through the filter.</li>
-      <li>Set it to <b>Setting B</b> and look again.</li>
-      <li>Tell the app which one made the sky darker.</li>
-    </ol>
-    <div class="row">
-      <button id="btnHandA" class="grow">A was darker</button>
-      <button id="btnHandB" class="grow">B was darker</button>
-    </div>
-    <div class="tiny dim" style="margin-top:6px" id="handNote"></div>
-  </div>
-
-  <div class="card">
     <h1>Manual overrides</h1>
     <div class="grid2">
-      <div><label>Compass offset °</label><input id="inOff" type="number" step="0.1" value="0"></div>
-      <div><label>Magnetic declination °</label><input id="inDec" type="number" step="0.1" value="0"></div>
+      <div><label>Extra compass trim °</label><input id="inOff" type="number" step="0.1" value="0"></div>
+      <div>
+        <label>North reference</label>
+        <select id="selNorth">
+          <option value="mag">Magnetic (apply WMM)</option>
+          <option value="true">True (apply nothing)</option>
+        </select>
+      </div>
     </div>
-    <div class="tiny dim" style="margin-top:6px">Declination is only used if you have not done a shadow sight.
-      Leave it at 0 once Step 2 is done — the sight already includes it.</div>
+    <div class="tiny dim" style="margin-top:6px">The trim is added on top of the automatic declination —
+      leave it at 0 unless you have a reason. The walk check sets the north reference for you.</div>
     <hr>
     <div class="grid2">
       <div><label>Latitude</label><input id="inLat" type="number" step="0.0001"></div>
@@ -393,6 +407,149 @@ for(const w of WORDS){
 }
 const SORTED=[...GLYPHS].sort((a,b)=>a.psi-b.psi);
 
+/* ═══════════ World Magnetic Model 2025 ═══════════
+   Gives magnetic declination anywhere on Earth from lat/lon/date, to about 0.4°.
+   Replaces the old shadow-sight calibration and updates itself as you travel. */
+/* WMM2025 (NOAA/BGS), epoch 2025.0, released 11/13/2024. n,m ascending; each entry g,h,dg,dh */
+const WMM_EPOCH=2025.0;
+const WMM_C=[
+  -29351.8,0,12,0, -1410.8,4545.4,9.7,-21.5,   // n=1
+  -2556.6,0,-11.6,0, 2951.1,-3133.6,-5.2,-27.7, 1649.3,-815.1,-8,-12.1,   // n=2
+  1361,0,-1.3,0, -2404.1,-56.6,-4.2,4, 1243.8,237.5,0.4,-0.3, 453.6,-549.5,-15.6,-4.1,   // n=3
+  895,0,-1.6,0, 799.5,278.6,-2.4,-1.1, 55.7,-133.9,-6,4.1, -281.1,212,5.6,1.6, 12.1,-375.6,-7,-4.4,   // n=4
+  -233.2,0,0.6,0, 368.9,45.4,1.4,-0.5, 187.2,220.2,0,2.2, -138.7,-122.9,0.6,0.4, -142,43,2.2,1.7, 20.9,106.1,0.9,1.9,   // n=5
+  64.4,0,-0.2,0, 63.8,-18.4,-0.4,0.3, 76.9,16.8,0.9,-1.6, -115.7,48.8,1.2,-0.4, -40.9,-59.8,-0.9,0.9, 14.9,10.9,0.3,0.7, -60.7,72.7,0.9,0.9,   // n=6
+  79.5,0,-0,0, -77,-48.9,-0.1,0.6, -8.8,-14.4,-0.1,0.5, 59.3,-1,0.5,-0.8, 15.8,23.4,-0.1,0, 2.5,-7.4,-0.8,-1, -11.1,-25.1,-0.8,0.6, 14.2,-2.3,0.8,-0.2,   // n=7
+  23.2,0,-0.1,0, 10.8,7.1,0.2,-0.2, -17.5,-12.6,0,0.5, 2,11.4,0.5,-0.4, -21.7,-9.7,-0.1,0.4, 16.9,12.7,0.3,-0.5, 15,0.7,0.2,-0.6, -16.8,-5.2,-0,0.3, 0.9,3.9,0.2,0.2,   // n=8
+  4.6,0,-0,0, 7.8,-24.8,-0.1,-0.3, 3,12.2,0.1,0.3, -0.2,8.3,0.3,-0.3, -2.5,-3.3,-0.3,0.3, -13.1,-5.2,0,0.2, 2.4,7.2,0.3,-0.1, 8.6,-0.6,-0.1,-0.2, -8.7,0.8,0.1,0.4, -12.9,10,-0.1,0.1,   // n=9
+  -1.3,0,0.1,0, -6.4,3.3,0,0, 0.2,0,0.1,-0, 2,2.4,0.1,-0.2, -1,5.3,-0,0.1, -0.6,-9.1,-0.3,-0.1, -0.9,0.4,0,0.1, 1.5,-4.2,-0.1,0, 0.9,-3.8,-0.1,-0.1, -2.7,0.9,-0,0.2, -3.9,-9.1,-0,-0,   // n=10
+  2.9,0,0,0, -1.5,0,-0,-0, -2.5,2.9,0,0.1, 2.4,-0.6,0,-0, -0.6,0.2,0,0.1, -0.1,0.5,-0.1,-0, -0.6,-0.3,0,-0, -0.1,-1.2,-0,0.1, 1.1,-1.7,-0.1,-0, -1,-2.9,-0.1,0, -0.2,-1.8,-0.1,0, 2.6,-2.3,-0.1,0,   // n=11
+  -2,0,0,0, -0.2,-1.3,0,-0, 0.3,0.7,-0,0, 1.2,1,-0,-0.1, -1.3,-1.4,-0,0.1, 0.6,-0,-0,-0, 0.6,0.6,0.1,-0, 0.5,-0.1,-0,-0, -0.1,0.8,0,0, -0.4,0.1,0,-0, -0.2,-1,-0.1,-0, -1.3,0.1,-0,0, -0.7,0.2,-0.1,-0.1,   // n=12
+];
+
+/* World Magnetic Model 2025 — declination.
+   Direct port of the NOAA legacy reference algorithm. Returns degrees east of true north. */
+const WMM_N = 12;
+let _wmmReady = false, _c = [], _cd = [], _snorm = [], _k = [], _fn = [], _fm = [];
+function wmmInit(){
+  if(_wmmReady) return;
+  const S = WMM_N + 1;
+  const mk = () => Array.from({length:S}, () => new Float64Array(S));
+  _c = mk(); _cd = mk(); _k = mk();
+  _snorm = new Float64Array(S*S); _fn = new Float64Array(S); _fm = new Float64Array(S);
+  let i = 0;
+  for(let n=1;n<=WMM_N;n++) for(let m=0;m<=n;m++){
+    const g=WMM_C[i*4], h=WMM_C[i*4+1], dg=WMM_C[i*4+2], dh=WMM_C[i*4+3]; i++;
+    _c[m][n]=g; _cd[m][n]=dg;
+    if(m!==0){ _c[n][m-1]=h; _cd[n][m-1]=dh; }
+  }
+  // convert Schmidt-normalised Gauss coefficients to unnormalised
+  _snorm[0]=1.0; _fm[0]=0.0;
+  for(let n=1;n<=WMM_N;n++){
+    _snorm[n] = _snorm[n-1]*(2*n-1)/n;
+    let j=2;
+    for(let m=0, D2=n+1; D2>0; D2--, m++){
+      _k[m][n] = (((n-1)*(n-1))-(m*m)) / ((2*n-1)*(2*n-3));
+      if(m>0){
+        const flnmj = ((n-m+1)*j)/(n+m);
+        _snorm[n+m*S] = _snorm[n+(m-1)*S]*Math.sqrt(flnmj);
+        j = 1;
+        _c[n][m-1]  = _snorm[n+m*S]*_c[n][m-1];
+        _cd[n][m-1] = _snorm[n+m*S]*_cd[n][m-1];
+      }
+      _c[m][n]  = _snorm[n+m*S]*_c[m][n];
+      _cd[m][n] = _snorm[n+m*S]*_cd[m][n];
+    }
+    _fn[n]=n+1; _fm[n]=n;
+  }
+  _k[1][1]=0.0;
+  _wmmReady = true;
+}
+
+/* glat/glon in degrees, alt in km, decimalYear e.g. 2026.66 */
+function wmmField(glat, glon, alt, decimalYear){
+  wmmInit();
+  const S = WMM_N+1, DEG = Math.PI/180;
+  const p = Float64Array.from(_snorm);           // working copy
+  const dp = Array.from({length:S}, () => new Float64Array(S));
+  const sp = new Float64Array(S), cp = new Float64Array(S), pp = new Float64Array(S);
+  const tc = Array.from({length:S}, () => new Float64Array(S));
+  sp[0]=0.0; cp[0]=1.0; pp[0]=1.0; dp[0][0]=0.0;
+
+  const a=6378.137, b=6356.7523142, re=6371.2;
+  const a2=a*a, b2=b*b, c2=a2-b2, a4=a2*a2, b4=b2*b2, c4=a4-b4;
+  const dt = decimalYear - WMM_EPOCH;
+
+  const rlon=glon*DEG, rlat=glat*DEG;
+  const srlon=Math.sin(rlon), crlon=Math.cos(rlon);
+  const srlat=Math.sin(rlat), crlat=Math.cos(rlat);
+  const srlat2=srlat*srlat, crlat2=crlat*crlat;
+  sp[1]=srlon; cp[1]=crlon;
+
+  // geodetic -> geocentric spherical
+  const q=Math.sqrt(a2-c2*srlat2), q1=alt*q;
+  const q2=((q1+a2)/(q1+b2))*((q1+a2)/(q1+b2));
+  const ct=srlat/Math.sqrt(q2*crlat2+srlat2);
+  const st=Math.sqrt(1.0-ct*ct);
+  const r=Math.sqrt(alt*alt+2.0*q1+(a4-c4*srlat2)/(q*q));
+  const d=Math.sqrt(a2*crlat2+b2*srlat2);
+  const ca=(alt+d)/r, sa=c2*crlat*srlat/(r*d);
+
+  for(let m=2;m<=WMM_N;m++){
+    sp[m]=sp[1]*cp[m-1]+cp[1]*sp[m-1];
+    cp[m]=cp[1]*cp[m-1]-sp[1]*sp[m-1];
+  }
+  const aor=re/r;
+  let ar=aor*aor, br=0, bt=0, bp=0, bpp=0;
+  for(let n=1;n<=WMM_N;n++){
+    ar=ar*aor;
+    for(let m=0, D4=n+1; D4>0; D4--, m++){
+      if(n===m){
+        p[n+m*S] = st*p[(n-1)+(m-1)*S];
+        dp[m][n] = st*dp[m-1][n-1] + ct*p[(n-1)+(m-1)*S];
+      } else if(n===1 && m===0){
+        p[n+m*S] = ct*p[(n-1)+m*S];
+        dp[m][n] = ct*dp[m][n-1] - st*p[(n-1)+m*S];
+      } else if(n>1 && n!==m){
+        if(m > n-2){ p[(n-2)+m*S]=0.0; dp[m][n-2]=0.0; }
+        p[n+m*S] = ct*p[(n-1)+m*S] - _k[m][n]*p[(n-2)+m*S];
+        dp[m][n] = ct*dp[m][n-1] - st*p[(n-1)+m*S] - _k[m][n]*dp[m][n-2];
+      }
+      tc[m][n] = _c[m][n] + dt*_cd[m][n];
+      if(m!==0) tc[n][m-1] = _c[n][m-1] + dt*_cd[n][m-1];
+
+      const par = ar*p[n+m*S];
+      let temp1, temp2;
+      if(m===0){ temp1 = tc[m][n]*cp[m];               temp2 = tc[m][n]*sp[m]; }
+      else     { temp1 = tc[m][n]*cp[m]+tc[n][m-1]*sp[m]; temp2 = tc[m][n]*sp[m]-tc[n][m-1]*cp[m]; }
+      bt -= ar*temp1*dp[m][n];
+      bp += _fm[m]*temp2*par;
+      br += _fn[n]*temp1*par;
+
+      if(st===0.0 && m===1){                       // geographic poles
+        pp[n] = (n===1) ? pp[n-1] : ct*pp[n-1]-_k[m][n]*pp[n-2];
+        bpp += _fm[m]*temp2*(ar*pp[n]);
+      }
+    }
+  }
+  bp = (st===0.0) ? bpp : bp/st;
+
+  const bx = -bt*ca - br*sa;
+  const by = bp;
+  const bz =  bt*sa - br*ca;
+  const bh = Math.hypot(bx,by);
+  return {
+    dec: Math.atan2(by,bx)*180/Math.PI,
+    inc: Math.atan2(bz,bh)*180/Math.PI,
+    h: bh, f: Math.hypot(bh,bz)
+  };
+}
+function decimalYear(dt){
+  const y=dt.getUTCFullYear();
+  const s=Date.UTC(y,0,1), e=Date.UTC(y+1,0,1);
+  return y + (dt.getTime()-s)/(e-s);
+}
+
 /* ═══════════ solar position (NOAA low-precision, ±0.01°) ═══════════ */
 function julianDay(dt){
   let y=dt.getUTCFullYear(), mo=dt.getUTCMonth()+1;
@@ -435,18 +592,25 @@ const norm=a=>{const L=len(a);return L<1e-12?[0,0,0]:scl(a,1/L);};
 
 /* ═══════════ state ═══════════ */
 const S={
-  psiT:null, off:0, dec:0, hand:1, handDone:false,
+  psiT:null, off:0, hand:1, handDone:false,
+  northRef:"mag", walkDone:false, walkDiff:null,
   lat:null, lon:null, acc:null,
   az:null, el:null, roll:null, absOK:false,
   frozen:false, frame:"level",
-  aimSrc:"sensor", azSamples:[], manAz:0, manEl:0,
+  aimSrc:"sensor", manAz:0, manEl:0,
   calPsi:0, ringShown:0
 };
 function save(){
   localStorage.setItem("pf", JSON.stringify({
-    psiT:S.psiT, off:S.off, dec:S.dec, hand:S.hand, handDone:S.handDone,
-    lat:S.lat, lon:S.lon, frame:S.frame, azSamples:S.azSamples
+    psiT:S.psiT, off:S.off, hand:S.hand, handDone:S.handDone,
+    northRef:S.northRef, walkDone:S.walkDone, walkDiff:S.walkDiff,
+    lat:S.lat, lon:S.lon, frame:S.frame
   }));
+}
+/* declination here and now, from the embedded WMM2025 */
+function declinationNow(){
+  if(S.lat===null||S.lon===null) return null;
+  try{ return wmmField(S.lat,S.lon,0,decimalYear(new Date())); }catch(e){ return null; }
 }
 function load(){
   try{
@@ -551,8 +715,10 @@ function solve(){
   else { camAz=S.az; camEl=S.el; }
   if(camAz===null||camAz===undefined||lat===null) return null;
 
-  const offset = S.azSamples.length? S.off : S.dec;
-  camAz = mod(camAz + offset, 360);
+  // magnetic -> true north, from the World Magnetic Model, plus any manual trim
+  const wf = declinationNow();
+  const dec = (S.northRef==="mag" && wf) ? wf.dec : 0;
+  camAz = mod(camAz + dec + S.off, 360);
 
   const sp=sunPosition(now,lat,lon);
   const s=dir(sp.az,sp.alt);
@@ -659,14 +825,6 @@ function paint(R){
   S.ringShown=R.psiTop;
   drawRing($("ring"), R.psiTop);
 
-  // handedness helper
-  $("hdGeo").textContent = (R.sp.alt>15 && R.gamma>35 && R.gamma<75) ? "good now" : "wait for better";
-  $("hdGeo").className="pill "+((R.sp.alt>15&&R.gamma>35&&R.gamma<75)?"ok":"warn");
-  if(S.psiT!==null){
-    const A=mod(S.psiT+S.hand*R.theta,180), B=mod(S.psiT-S.hand*R.theta,180);
-    $("hdA").textContent=describe(A).main+"  ("+A.toFixed(0)+"°)";
-    $("hdB").textContent=describe(B).main+"  ("+B.toFixed(0)+"°)";
-  }
 }
 
 /* ═══════════ sensors ═══════════ */
@@ -782,50 +940,109 @@ $("btnSavePsi").onclick=()=>{
 };
 $("inPsiT").onchange=e=>{const v=parseFloat(e.target.value); if(!isNaN(v)){S.calPsi=mod(v,360);drawCal();}};
 
-$("btnCapAz").onclick=()=>{
-  if(S.az===null){alert("No compass reading yet — tap Enable sensors first.");return;}
-  if(S.lat===null){alert("No GPS fix yet.");return;}
-  const sp=sunPosition(new Date(),S.lat,S.lon);
-  if(sp.alt<3){alert("The sun is too low (or down) for a reliable sight.");return;}
-  if(sp.alt>55 && !confirm("The sun is "+sp.alt.toFixed(0)+"° up. The shadow is short, so its "+
-     "direction is hard to judge, and near midday the sun's azimuth swings quickly.\n\n"+
-     "A sight in the morning or late afternoon (sun 15–45° up) is worth several of these.\n\n"+
-     "Capture anyway?")) return;
-  const d=mod(sp.az-S.az+180,360)-180;
-  S.azSamples.push(+d.toFixed(2));
-  S.off=+(S.azSamples.reduce((a,b)=>a+b,0)/S.azSamples.length).toFixed(2);
-  $("calSunAz").textContent=sp.az.toFixed(1)+"°";
-  $("calRawAz").textContent=S.az.toFixed(1)+"°";
+/* ── handedness: head tilted 45 deg right at the same reflection ── */
+const TILT=45;
+function handPaint(){
+  if(S.psiT===null){ $("hdA").textContent="—"; $("hdB").textContent="—"; return; }
+  const A=mod(S.psiT-TILT,180), B=mod(S.psiT+TILT,180);
+  $("hdA").textContent=describe(A).main+"  ("+A.toFixed(0)+"°)";
+  $("hdB").textContent=describe(B).main+"  ("+B.toFixed(0)+"°)";
+}
+$("btnHandA").onclick=()=>{ if(S.psiT===null){alert("Do Step 1 first.");return;}
+  S.handDone=true; save(); status(); alert("Handedness confirmed as assumed."); };
+$("btnHandB").onclick=()=>{ if(S.psiT===null){alert("Do Step 1 first.");return;}
+  S.hand=-S.hand; S.handDone=true; save(); status(); handPaint();
+  alert("Handedness flipped and saved."); };
+
+/* ── north reference check: GPS course over ground vs compass ── */
+let walk=null;
+function bearing(a,b){
+  const D2=Math.PI/180;
+  const p1=a.lat*D2,p2=b.lat*D2,dl=(b.lon-a.lon)*D2;
+  const y=Math.sin(dl)*Math.cos(p2);
+  const x=Math.cos(p1)*Math.sin(p2)-Math.sin(p1)*Math.cos(p2)*Math.cos(dl);
+  return mod(Math.atan2(y,x)*R2D,360);
+}
+function haversine(a,b){
+  const D2=Math.PI/180,R=6371000;
+  const dp=(b.lat-a.lat)*D2, dl=(b.lon-a.lon)*D2;
+  const h=Math.sin(dp/2)**2+Math.cos(a.lat*D2)*Math.cos(b.lat*D2)*Math.sin(dl/2)**2;
+  return 2*R*Math.asin(Math.sqrt(h));
+}
+function walkPaint(){
+  if(!walk||walk.pts.length<2){ return; }
+  const p=walk.pts, a=p[0], b=p[p.length-1];
+  const dist=haversine(a,b);
+  $("wkDist").textContent=dist.toFixed(0)+" m";
+  if(dist<15){ $("wkNote").textContent="Keep walking — need at least 50 m for a usable bearing."; return; }
+  const gps=bearing(a,b);
+  // circular mean of the compass samples
+  let sx=0,sy=0; for(const h of walk.head){ sx+=Math.cos(h*Math.PI/180); sy+=Math.sin(h*Math.PI/180); }
+  const magH=mod(Math.atan2(sy,sx)*R2D,360);
+  const diff=mod(gps-magH+180,360)-180;
+  $("wkGps").textContent=gps.toFixed(1)+"°";
+  $("wkMag").textContent=magH.toFixed(1)+"°";
+  $("wkDiff").textContent=(diff>=0?"+":"")+diff.toFixed(1)+"°";
+  return {dist,gps,magH,diff};
+}
+function walkFinish(){
+  const r=walkPaint();
+  const v=$("wkVerdict");
+  if(!r||r.dist<50){ v.textContent="too short"; v.className="pill bad";
+    $("wkNote").textContent="Walked only "+(r?r.dist.toFixed(0):0)+" m. Try again with at least 50 m in a straight line."; return; }
+  const wf=declinationNow();
+  if(!wf){ v.textContent="no gps"; v.className="pill bad"; return; }
+  const resMag=Math.abs(mod(r.diff-wf.dec+180,360)-180);
+  const resTrue=Math.abs(mod(r.diff+180,360)-180);
+  S.walkDiff=+r.diff.toFixed(1); S.walkDone=true;
+  if(Math.abs(wf.dec)<3){
+    v.textContent="inconclusive"; v.className="pill warn";
+    $("wkNote").textContent="Declination here is only "+wf.dec.toFixed(1)+"°, so the two possibilities are "+
+      "nearly identical and this test cannot separate them. It also means it barely matters — leave the "+
+      "setting alone. Re-run somewhere with a larger declination if you want certainty.";
+  } else if(resMag<resTrue){
+    S.northRef="mag"; v.textContent="magnetic"; v.className="pill ok";
+    $("wkNote").textContent="Your compass reads magnetic north, so the app applies the "+wf.dec.toFixed(1)+
+      "° declination. Residual after correction: "+resMag.toFixed(1)+"°. This is the expected answer for Chrome on Android.";
+  } else {
+    S.northRef="true"; v.textContent="true north"; v.className="pill ok";
+    $("wkNote").textContent="Your compass already reports true north, so the app now applies no declination. "+
+      "Residual: "+resTrue.toFixed(1)+"°. Unusual, but it happens on some Android builds — good thing you checked.";
+  }
+  $("selNorth").value=S.northRef;
+  save(); status();
+}
+$("btnWalk").onclick=()=>{
+  if(walk){                                   // stop
+    if(walk.watch!==null) navigator.geolocation.clearWatch(walk.watch);
+    clearInterval(walk.timer);
+    walkFinish(); walk=null;
+    $("btnWalk").textContent="Start walk"; $("btnWalk").classList.remove("hot");
+    return;
+  }
+  if(S.az===null){alert("No compass reading yet — tap Enable sensors on the Aim tab.");return;}
+  if(!navigator.geolocation){alert("No geolocation available.");return;}
+  walk={pts:[],head:[],watch:null,timer:null};
+  $("wkVerdict").textContent="walking…"; $("wkVerdict").className="pill warn";
+  $("wkNote").textContent="Walk straight ahead at a normal pace. Tap Stop after about 30 seconds.";
+  walk.watch=navigator.geolocation.watchPosition(p=>{
+    if(p.coords.accuracy>25) return;          // ignore poor fixes
+    walk.pts.push({lat:p.coords.latitude,lon:p.coords.longitude});
+    walkPaint();
+  },()=>{},{enableHighAccuracy:true,maximumAge:0,timeout:20000});
+  walk.timer=setInterval(()=>{ if(S.az!==null) walk.head.push(S.az); },300);
+  $("btnWalk").textContent="Stop walk"; $("btnWalk").classList.add("hot");
+};
+$("btnWalkClr").onclick=()=>{
+  S.walkDone=false; S.walkDiff=null; S.northRef="mag"; $("selNorth").value="mag";
+  for(const id of ["wkDist","wkGps","wkMag","wkDiff"]) $(id).textContent="—";
+  $("wkVerdict").textContent="—"; $("wkVerdict").className="pill";
+  $("wkNote").textContent="Cleared. The app assumes magnetic north until you run the check.";
   save(); status();
 };
-$("btnClrAz").onclick=()=>{S.azSamples=[];S.off=0;save();status();};
+$("selNorth").onchange=e=>{S.northRef=e.target.value;save();status();};
 
-/* interference check */
-let ifA=null, ifB=null;
-function ifPaint(){
-  $("ifA").textContent = ifA===null? "—" : ifA.toFixed(1)+"°";
-  $("ifB").textContent = ifB===null? "—" : ifB.toFixed(1)+"°";
-  if(ifA===null||ifB===null){ $("ifD").textContent="—"; return; }
-  const d=mod(ifB-ifA+180,360)-180;
-  $("ifD").textContent=(d>=0?"+":"")+d.toFixed(1)+"°";
-  const a=Math.abs(d);
-  $("ifNote").textContent = a<3
-    ? "Under 3° — the camera is not meaningfully disturbing the compass. Hold it however you like."
-    : a<8
-    ? a.toFixed(0)+"° — noticeable. Keep the M at arm's length while you take the reading, then use "+
-      "Hold reading and go to the lens."
-    : a.toFixed(0)+"° — large. Take every reading with the camera set down or fully at arm's length; "+
-      "at this level it would swamp everything else.";
-}
-$("btnIfA").onclick=()=>{ if(S.az===null){alert("No compass reading yet.");return;}
-  ifA=S.az; ifPaint(); };
-$("btnIfB").onclick=()=>{ if(S.az===null){alert("No compass reading yet.");return;}
-  ifB=S.az; ifPaint(); };
-$("btnHandA").onclick=()=>{S.handDone=true;save();status();alert("Kept current handedness.");};
-$("btnHandB").onclick=()=>{S.hand=-S.hand;S.handDone=true;save();status();
-  alert("Handedness flipped and saved.");};
 $("inOff").onchange=e=>{S.off=parseFloat(e.target.value)||0;save();status();};
-$("inDec").onchange=e=>{S.dec=parseFloat(e.target.value)||0;save();};
 $("inLat").onchange=e=>{S.lat=parseFloat(e.target.value);save();};
 $("inLon").onchange=e=>{S.lon=parseFloat(e.target.value);save();};
 $("btnGeo").onclick=getGeo;
@@ -835,26 +1052,38 @@ function status(){
   const a=$("stA"),b=$("stB"),c=$("stC");
   a.textContent=S.psiT===null?"not set":"ψT = "+S.psiT.toFixed(1)+"°";
   a.className="pill "+(S.psiT===null?"bad":"ok");
-  b.textContent=S.azSamples.length? S.off.toFixed(1)+"° ("+S.azSamples.length+" sights)":"not set";
-  b.className="pill "+(S.azSamples.length?"ok":"warn");
   c.textContent=S.handDone?"confirmed":"not done";
   c.className="pill "+(S.handDone?"ok":"warn");
-  $("calOff").textContent=S.off.toFixed(1)+"°";
-  if(S.azSamples.length){
-    const a=S.azSamples, m=a.reduce((x,y)=>x+y,0)/a.length;
-    const sd=a.length>1? Math.sqrt(a.reduce((s,x)=>s+(x-m)*(x-m),0)/(a.length-1)) : 0;
-    $("azSamples").textContent="sights: "+a.map(x=>x.toFixed(1)+"°").join(", ")+
-      (a.length>1? "   ·   spread ±"+sd.toFixed(1)+"°"+
-        (sd>6?" — inconsistent, consider clearing and redoing":"") : "");
-  } else $("azSamples").textContent="";
-  $("inOff").value=S.off; $("inDec").value=S.dec;
+  b.textContent=S.walkDone? (S.northRef==="mag"?"magnetic ✓":"true north ✓") : "assumed magnetic";
+  b.className="pill "+(S.walkDone?"ok":"warn");
+
+  const wf=declinationNow(), sd=$("stDec");
+  if(!wf){
+    sd.textContent="needs GPS"; sd.className="pill warn";
+    $("decPos").textContent="—"; $("decVal").textContent="—"; $("decH").textContent="—";
+    $("decNote").textContent="Turn on location and the declination appears here automatically.";
+  } else {
+    sd.textContent=(wf.dec>=0?"+":"")+wf.dec.toFixed(1)+"° "+(wf.dec>=0?"E":"W");
+    sd.className="pill ok";
+    $("decPos").textContent=S.lat.toFixed(3)+"°, "+S.lon.toFixed(3)+"°";
+    $("decVal").textContent=(wf.dec>=0?"+":"")+wf.dec.toFixed(2)+"°  ("+
+      Math.abs(wf.dec).toFixed(1)+"° "+(wf.dec>=0?"east":"west")+" of true north)";
+    $("decH").textContent=(wf.h/1000).toFixed(1)+" µT";
+    $("decNote").textContent = wf.h<6000
+      ? "Warning: the horizontal field here is very weak, so any magnetic compass is unreliable. Use manual aim entry."
+      : (S.northRef==="mag"
+         ? "Applied to every reading. Recomputed continuously as your position changes."
+         : "Not applied — you have set the north reference to true north.");
+  }
+  handPaint();
+  $("inOff").value=S.off; $("selNorth").value=S.northRef;
   if(S.lat!==null){$("inLat").value=S.lat.toFixed(5);$("inLon").value=S.lon.toFixed(5);}
 }
 
 /* boot */
-$("selFrame").value=S.frame;
+$("selFrame").value=S.frame; $("selNorth").value=S.northRef;
 if(S.psiT!==null) S.calPsi=S.psiT;
-status(); drawCal(); render();
+status(); drawCal(); handPaint(); render();
 setInterval(render,250);
 if("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(()=>{});
 </script>
