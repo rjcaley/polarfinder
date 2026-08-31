@@ -1,4 +1,4 @@
-const CACHE = "polarfinder-v2";
+const CACHE = "polarfinder-v3";
 const FILES = [
   "./", "./index.html", "./manifest.webmanifest",
   "./icon-192.png", "./icon-512.png", "./icon-maskable.png"

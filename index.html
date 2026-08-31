@@ -185,26 +185,41 @@ hr{border:0;border-top:1px solid var(--line);margin:12px 0}
   </div>
 
   <div class="card">
-    <h1>Step 2 · Handedness (do this right after Step 1)</h1>
-    <div class="note">There are two mirror-image ways the ring's rotation could map onto the world, and
-      Step 1 cannot tell them apart because its geometry is symmetric. This settles it in thirty
-      seconds, <b>at the same reflection, with no sun, no compass and no GPS</b>.</div>
+    <h1>Step 2 · Handedness (indoors, no sun, any hour)</h1>
+    <div class="note">There are two mirror-image ways the ring could map onto the world, and Step 1
+      cannot tell them apart — a horizontal reflection is polarised horizontally <b>in the world</b>,
+      so its geometry is symmetric no matter how you stand or tilt.
+      <br><br>This test breaks the symmetry with a <b>screen</b>. Any LCD or OLED emits linearly
+      polarised light, and because the polariser is bonded to the panel, the polarisation
+      <b>turns with the device</b>. Turn the screen and the correct filter position must turn with it —
+      in one direction if the handedness is as assumed, the other if it is mirrored.</div>
     <ol class="steps">
-      <li>Go back to the darkest position you just found in Step 1, looking at the same reflection.</li>
-      <li>Now <b>tilt your head 45° to the right</b> — right ear toward right shoulder — still looking
-        at the reflection.</li>
-      <li>Re-find the darkest position by rotating the filter, and read the marking now at the top.</li>
-      <li>Tap whichever of the two below matches what you found.</li>
+      <li>Put a plain white image full-screen on <b>a second device</b> — a tablet, spare phone, or
+        laptop. Something you can rotate in its own plane. Dim the room a little.</li>
+      <li>Stand the screen upright facing you, at arm's length or so. Keep your head level.</li>
+      <li>Look at it through the filter, engraved face toward the screen, and rotate the filter to the
+        <b>darkest</b> point. Set the dial below to the marking now at the top, then tap Capture.</li>
+      <li>Now rotate <b>the screen</b> 45° clockwise, as you look at it — the top-right corner drops
+        toward the right. Keep it facing you.</li>
+      <li>Re-find the darkest filter position and read the marking at the top. Tap whichever of the
+        two candidates matches.</li>
     </ol>
+    <svg id="hdRing" viewBox="-320 -320 640 640"></svg>
+    <div class="row" style="margin-top:8px">
+      <input id="inPsi1" type="number" step="0.5" value="0" class="grow">
+      <button id="btnCapPsi1" class="pri">Capture</button>
+    </div>
+    <div class="tiny dim" style="margin-top:6px" id="psi1Readout"></div>
+    <hr>
     <div class="kv"><span class="dim">If handedness is as assumed</span><b id="hdA" class="mono">—</b></div>
     <div class="kv"><span class="dim">If it is mirrored</span><b id="hdB" class="mono">—</b></div>
     <div class="row" style="margin-top:8px">
-      <button id="btnHandA" class="grow sm">Top matched the first</button>
-      <button id="btnHandB" class="grow sm">Top matched the second</button>
+      <button id="btnHandA" class="grow sm">Matched the first</button>
+      <button id="btnHandB" class="grow sm">Matched the second</button>
     </div>
-    <div class="tiny dim" style="margin-top:6px" id="handNote">The two candidates sit 90° apart on the
-      ring, so there is no way to mistake one for the other. The tilt does not need to be an accurate
-      45° — anything from 20° to 60° separates them clearly.</div>
+    <div class="tiny dim" style="margin-top:6px" id="handNote">The two candidates sit 90° apart, so
+      there is no way to confuse them. The screen's own polarisation angle cancels out — only the
+      change matters — so you never need to know which way its polariser runs.</div>
   </div>
 
   <div class="card">
@@ -592,7 +607,7 @@ const norm=a=>{const L=len(a);return L<1e-12?[0,0,0]:scl(a,1/L);};
 
 /* ═══════════ state ═══════════ */
 const S={
-  psiT:null, off:0, hand:1, handDone:false,
+  psiT:null, off:0, hand:1, handDone:false, hdPsi1:0, hdCaptured:false,
   northRef:"mag", walkDone:false, walkDiff:null,
   lat:null, lon:null, acc:null,
   az:null, el:null, roll:null, absOK:false,
@@ -603,6 +618,7 @@ const S={
 function save(){
   localStorage.setItem("pf", JSON.stringify({
     psiT:S.psiT, off:S.off, hand:S.hand, handDone:S.handDone,
+    hdPsi1:S.hdPsi1, hdCaptured:S.hdCaptured,
     northRef:S.northRef, walkDone:S.walkDone, walkDiff:S.walkDiff,
     lat:S.lat, lon:S.lon, frame:S.frame
   }));
@@ -888,8 +904,8 @@ function drawCal(){
   $("psiReadout").textContent="At the top: "+d.main+"   ·   ψ = "+S.calPsi.toFixed(1)+"°";
   $("inPsiT").value=S.calPsi.toFixed(1);
 }
-(function dialDrag(){
-  const sv=$("calRing"); let on=false,last=0;
+function makeDial(svgId, get, set, redraw){
+  const sv=$(svgId); let on=false,last=0;
   const ang=ev=>{
     const r=sv.getBoundingClientRect();
     const p=ev.touches?ev.touches[0]:ev;
@@ -898,14 +914,16 @@ function drawCal(){
   };
   const dn=e=>{on=true;last=ang(e);e.preventDefault();};
   const mv=e=>{ if(!on)return; const a=ang(e);
-    S.calPsi=mod(S.calPsi-(mod(a-last+180,360)-180),360); last=a; drawCal(); e.preventDefault(); };
+    set(mod(get()-(mod(a-last+180,360)-180),360)); last=a; redraw(); e.preventDefault(); };
   const up=()=>{on=false;};
   sv.addEventListener("touchstart",dn,{passive:false});
   sv.addEventListener("touchmove",mv,{passive:false});
   sv.addEventListener("touchend",up);
-  sv.addEventListener("mousedown",dn); window.addEventListener("mousemove",mv);
-  window.addEventListener("mouseup",up);
-})();
+  sv.addEventListener("mousedown",dn);
+  window.addEventListener("mousemove",mv); window.addEventListener("mouseup",up);
+}
+makeDial("calRing", ()=>S.calPsi, v=>{S.calPsi=v;}, drawCal);
+makeDial("hdRing",  ()=>S.hdPsi1, v=>{S.hdPsi1=v;}, ()=>{drawHd();handPaint();});
 
 /* ═══════════ UI wiring ═══════════ */
 function tab(n){
@@ -914,7 +932,7 @@ function tab(n){
     $(b).classList.toggle("on",act);
     $(p).classList.toggle("hide",!act);
   }
-  if(n==="Cal") drawCal();
+  if(n==="Cal"){ drawCal(); drawHd(); handPaint(); }
 }
 $("tabAim").onclick=()=>tab("Aim");
 $("tabCal").onclick=()=>tab("Cal");
@@ -940,19 +958,40 @@ $("btnSavePsi").onclick=()=>{
 };
 $("inPsiT").onchange=e=>{const v=parseFloat(e.target.value); if(!isNaN(v)){S.calPsi=mod(v,360);drawCal();}};
 
-/* ── handedness: head tilted 45 deg right at the same reflection ── */
-const TILT=45;
+/* ── handedness: rotate a screen 45° clockwise and see which way the ring follows ──
+   A screen's polariser is bonded to the panel, so turning the device turns the
+   polarisation with it. Turning it +45° clockwise must move the required ring
+   position by +45° if the handedness is as assumed, −45° if it is mirrored.
+   The screen's own polarisation angle cancels, so it never needs to be known. */
+const TURN=45;
+function drawHd(){
+  drawRing($("hdRing"), S.hdPsi1, {forceFront:true,noAxis:true});
+  $("inPsi1").value=S.hdPsi1.toFixed(1);
+  $("psi1Readout").textContent="Screen upright, at the top: "+describe(S.hdPsi1).main+
+    "   ·   ψ = "+S.hdPsi1.toFixed(1)+"°";
+}
 function handPaint(){
-  if(S.psiT===null){ $("hdA").textContent="—"; $("hdB").textContent="—"; return; }
-  const A=mod(S.psiT-TILT,180), B=mod(S.psiT+TILT,180);
+  if(!S.hdCaptured){
+    $("hdA").textContent="capture the first reading";
+    $("hdB").textContent="capture the first reading"; return;
+  }
+  const A=mod(S.hdPsi1+S.hand*TURN,180), B=mod(S.hdPsi1-S.hand*TURN,180);
   $("hdA").textContent=describe(A).main+"  ("+A.toFixed(0)+"°)";
   $("hdB").textContent=describe(B).main+"  ("+B.toFixed(0)+"°)";
 }
-$("btnHandA").onclick=()=>{ if(S.psiT===null){alert("Do Step 1 first.");return;}
+$("btnCapPsi1").onclick=()=>{
+  const v=parseFloat($("inPsi1").value);
+  if(isNaN(v)){alert("Set the dial first.");return;}
+  S.hdPsi1=mod(v,360); S.hdCaptured=true; save(); drawHd(); handPaint();
+  alert("First reading captured. Now turn the screen 45° clockwise and re-find the darkest point.");
+};
+$("inPsi1").onchange=e=>{const v=parseFloat(e.target.value);
+  if(!isNaN(v)){S.hdPsi1=mod(v,360);drawHd();handPaint();}};
+$("btnHandA").onclick=()=>{ if(!S.hdCaptured){alert("Capture the first reading first.");return;}
   S.handDone=true; save(); status(); alert("Handedness confirmed as assumed."); };
-$("btnHandB").onclick=()=>{ if(S.psiT===null){alert("Do Step 1 first.");return;}
+$("btnHandB").onclick=()=>{ if(!S.hdCaptured){alert("Capture the first reading first.");return;}
   S.hand=-S.hand; S.handDone=true; save(); status(); handPaint();
-  alert("Handedness flipped and saved."); };
+  alert("Handedness flipped and saved. The Aim tab is now corrected."); };
 
 /* ── north reference check: GPS course over ground vs compass ── */
 let walk=null;
@@ -1083,7 +1122,7 @@ function status(){
 /* boot */
 $("selFrame").value=S.frame; $("selNorth").value=S.northRef;
 if(S.psiT!==null) S.calPsi=S.psiT;
-status(); drawCal(); handPaint(); render();
+status(); drawCal(); drawHd(); handPaint(); render();
 setInterval(render,250);
 if("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(()=>{});
 </script>
