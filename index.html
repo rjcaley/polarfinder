@@ -186,40 +186,48 @@ hr{border:0;border-top:1px solid var(--line);margin:12px 0}
 
   <div class="card">
     <h1>Step 2 · Handedness (indoors, no sun, any hour)</h1>
-    <div class="note">There are two mirror-image ways the ring could map onto the world, and Step 1
-      cannot tell them apart — a horizontal reflection is polarised horizontally <b>in the world</b>,
-      so its geometry is symmetric no matter how you stand or tilt.
-      <br><br>This test breaks the symmetry with a <b>screen</b>. Any LCD or OLED emits linearly
-      polarised light, and because the polariser is bonded to the panel, the polarisation
-      <b>turns with the device</b>. Turn the screen and the correct filter position must turn with it —
-      in one direction if the handedness is as assumed, the other if it is mirrored.</div>
+    <div class="note">Every LCD and OLED emits linearly polarised light, and the polariser is bonded to
+      the panel — so the polarisation <b>turns with the device</b>. Turn the screen and the correct
+      filter position must turn with it: the same way round if the handedness is as assumed, the
+      opposite way if it is mirrored.
+      <br><br>You take <b>two readings</b>. The app compares them. It does not matter what the screen's
+      own polarisation angle is, and the turn does not have to be exactly 45° — but
+      <b>which way you turn it is critical</b>, so set that below.</div>
     <ol class="steps">
-      <li>Put a plain white image full-screen on <b>a second device</b> — a tablet, spare phone, or
-        laptop. Something you can rotate in its own plane. Dim the room a little.</li>
-      <li>Stand the screen upright facing you, at arm's length or so. Keep your head level.</li>
-      <li>Look at it through the filter, engraved face toward the screen, and rotate the filter to the
-        <b>darkest</b> point. Set the dial below to the marking now at the top, then tap Capture.</li>
-      <li>Now rotate <b>the screen</b> 45° clockwise, as you look at it — the top-right corner drops
-        toward the right. Keep it facing you.</li>
-      <li>Re-find the darkest filter position and read the marking at the top. Tap whichever of the
-        two candidates matches.</li>
+      <li>Plain white full-screen on a second device — tablet, spare phone, laptop. Dim the room.</li>
+      <li>Hold it upright facing you, head level. Rotate the filter to the <b>darkest</b> point, set the
+        dial to the marking at the top, and tap <b>Capture 1</b>.</li>
+      <li>Now turn the screen so its <b>top edge moves toward your right</b>, by roughly 45° — about
+        halfway to portrait. Keep the face pointed at you.</li>
+      <li>Re-find the darkest point, set the dial again, tap <b>Capture 2</b>.</li>
     </ol>
     <svg id="hdRing" viewBox="-320 -320 640 640"></svg>
     <div class="row" style="margin-top:8px">
-      <input id="inPsi1" type="number" step="0.5" value="0" class="grow">
-      <button id="btnCapPsi1" class="pri">Capture</button>
+      <input id="inPsi1" type="number" step="0.1" value="0" class="grow">
     </div>
-    <div class="tiny dim" style="margin-top:6px" id="psi1Readout"></div>
-    <hr>
-    <div class="kv"><span class="dim">If handedness is as assumed</span><b id="hdA" class="mono">—</b></div>
-    <div class="kv"><span class="dim">If it is mirrored</span><b id="hdB" class="mono">—</b></div>
     <div class="row" style="margin-top:8px">
-      <button id="btnHandA" class="grow sm">Matched the first</button>
-      <button id="btnHandB" class="grow sm">Matched the second</button>
+      <button id="btnCap1" class="pri grow sm">Capture 1 · upright</button>
+      <button id="btnCap2" class="pri grow sm">Capture 2 · turned</button>
     </div>
-    <div class="tiny dim" style="margin-top:6px" id="handNote">The two candidates sit 90° apart, so
-      there is no way to confuse them. The screen's own polarisation angle cancels out — only the
-      change matters — so you never need to know which way its polariser runs.</div>
+    <div style="margin-top:10px">
+      <label>Which way did the top edge go?</label>
+      <select id="selTurn">
+        <option value="1">Toward my right (clockwise)</option>
+        <option value="-1">Toward my left (anticlockwise)</option>
+      </select>
+    </div>
+    <hr>
+    <div class="kv"><span class="dim">Reading 1 · upright</span><b id="hdR1" class="mono">—</b></div>
+    <div class="kv"><span class="dim">Reading 2 · turned</span><b id="hdR2" class="mono">—</b></div>
+    <div class="kv"><span class="dim">Measured rotation</span><b id="hdShift" class="mono">—</b></div>
+    <div class="kv"><span class="dim">Verdict</span><span id="hdVerdict" class="pill">—</span></div>
+    <div class="row" style="margin-top:8px">
+      <button id="btnHandApply" class="grow">Apply verdict</button>
+      <button id="btnHandClr">Clear</button>
+    </div>
+    <div class="tiny dim" style="margin-top:6px" id="handNote">Both readings are entered on the same
+      dial. Rotating the filter 180° gives an identical setting, so either twin of a position is fine —
+      the app works that out for you.</div>
   </div>
 
   <div class="card">
@@ -607,7 +615,8 @@ const norm=a=>{const L=len(a);return L<1e-12?[0,0,0]:scl(a,1/L);};
 
 /* ═══════════ state ═══════════ */
 const S={
-  psiT:null, off:0, hand:1, handDone:false, hdPsi1:0, hdCaptured:false,
+  psiT:null, off:0, hand:1, handDone:false,
+  hdPsi1:null, hdPsi2:null, hdDial:0, hdTurn:1, handVerdict:null,
   northRef:"mag", walkDone:false, walkDiff:null,
   lat:null, lon:null, acc:null,
   az:null, el:null, roll:null, absOK:false,
@@ -618,7 +627,7 @@ const S={
 function save(){
   localStorage.setItem("pf", JSON.stringify({
     psiT:S.psiT, off:S.off, hand:S.hand, handDone:S.handDone,
-    hdPsi1:S.hdPsi1, hdCaptured:S.hdCaptured,
+    hdPsi1:S.hdPsi1, hdPsi2:S.hdPsi2, hdTurn:S.hdTurn,
     northRef:S.northRef, walkDone:S.walkDone, walkDiff:S.walkDiff,
     lat:S.lat, lon:S.lon, frame:S.frame
   }));
@@ -923,7 +932,7 @@ function makeDial(svgId, get, set, redraw){
   window.addEventListener("mousemove",mv); window.addEventListener("mouseup",up);
 }
 makeDial("calRing", ()=>S.calPsi, v=>{S.calPsi=v;}, drawCal);
-makeDial("hdRing",  ()=>S.hdPsi1, v=>{S.hdPsi1=v;}, ()=>{drawHd();handPaint();});
+makeDial("hdRing",  ()=>S.hdDial, v=>{S.hdDial=v;}, drawHd);
 
 /* ═══════════ UI wiring ═══════════ */
 function tab(n){
@@ -963,35 +972,73 @@ $("inPsiT").onchange=e=>{const v=parseFloat(e.target.value); if(!isNaN(v)){S.cal
    polarisation with it. Turning it +45° clockwise must move the required ring
    position by +45° if the handedness is as assumed, −45° if it is mirrored.
    The screen's own polarisation angle cancels, so it never needs to be known. */
-const TURN=45;
 function drawHd(){
-  drawRing($("hdRing"), S.hdPsi1, {forceFront:true,noAxis:true});
-  $("inPsi1").value=S.hdPsi1.toFixed(1);
-  $("psi1Readout").textContent="Screen upright, at the top: "+describe(S.hdPsi1).main+
-    "   ·   ψ = "+S.hdPsi1.toFixed(1)+"°";
+  drawRing($("hdRing"), S.hdDial, {forceFront:true,noAxis:true});
+  $("inPsi1").value=S.hdDial.toFixed(1);
 }
+/* signed difference of two ring positions, wrapped into (-90, +90].
+   The transmission axis is a line, so positions 180 deg apart are identical —
+   which is why either twin of a reading gives the same answer here. */
+function ringShift(a,b){ let d=mod(b-a,180); if(d>90) d-=180; return d; }
+
 function handPaint(){
-  if(!S.hdCaptured){
-    $("hdA").textContent="capture the first reading";
-    $("hdB").textContent="capture the first reading"; return;
+  const r1=S.hdPsi1, r2=S.hdPsi2;
+  $("hdR1").textContent = r1===null? "—" : describe(r1).main+"  ("+r1.toFixed(1)+"°)";
+  $("hdR2").textContent = r2===null? "—" : describe(r2).main+"  ("+r2.toFixed(1)+"°)";
+  const v=$("hdVerdict");
+  if(r1===null||r2===null){
+    $("hdShift").textContent="—"; v.textContent="—"; v.className="pill";
+    $("handNote").textContent="Capture both readings, then set which way you turned the screen.";
+    return;
   }
-  const A=mod(S.hdPsi1+S.hand*TURN,180), B=mod(S.hdPsi1-S.hand*TURN,180);
-  $("hdA").textContent=describe(A).main+"  ("+A.toFixed(0)+"°)";
-  $("hdB").textContent=describe(B).main+"  ("+B.toFixed(0)+"°)";
+  const sh=ringShift(r1,r2), mag=Math.abs(sh);
+  $("hdShift").textContent=(sh>=0?"+":"")+sh.toFixed(1)+"°  (you turned the screen ~"+
+    (S.hdTurn>0?"clockwise":"anticlockwise")+")";
+  if(mag<15){
+    v.textContent="inconclusive"; v.className="pill bad";
+    $("handNote").textContent="The two readings barely differ ("+mag.toFixed(0)+"°). Either the screen "+
+      "was not really turned, or one reading was mis-set. Turn it a clear 45° and redo.";
+    S.handVerdict=null; return;
+  }
+  if(mag>75){
+    v.textContent="inconclusive"; v.className="pill bad";
+    $("handNote").textContent="The shift is "+mag.toFixed(0)+"°, too close to 90° — at exactly 90° the "+
+      "two possibilities coincide and the test says nothing. Turn the screen nearer 45° and redo.";
+    S.handVerdict=null; return;
+  }
+  const verdict = Math.sign(sh)*S.hdTurn;      // +1 = as assumed, -1 = mirrored
+  S.handVerdict=verdict;
+  v.textContent = verdict>0? "as assumed" : "mirrored";
+  v.className="pill ok";
+  $("handNote").textContent="Rotation magnitude "+mag.toFixed(0)+"° — a good match to a 45° turn, so the "+
+    "test is sound. Tap Apply to store it."+(verdict<0?" Your ring runs the opposite way to the default; "+
+    "that is exactly what this step exists to catch.":"");
 }
-$("btnCapPsi1").onclick=()=>{
+function capture(which){
   const v=parseFloat($("inPsi1").value);
-  if(isNaN(v)){alert("Set the dial first.");return;}
-  S.hdPsi1=mod(v,360); S.hdCaptured=true; save(); drawHd(); handPaint();
-  alert("First reading captured. Now turn the screen 45° clockwise and re-find the darkest point.");
-};
+  if(isNaN(v)){alert("Set the dial to the marking at the top first.");return;}
+  if(which===1) S.hdPsi1=mod(v,360); else S.hdPsi2=mod(v,360);
+  save(); handPaint();
+  alert(which===1
+    ? "Reading 1 stored. Now turn the screen ~45°, re-find the darkest point, set the dial and tap Capture 2."
+    : "Reading 2 stored. Check the verdict below, then tap Apply.");
+}
+$("btnCap1").onclick=()=>capture(1);
+$("btnCap2").onclick=()=>capture(2);
 $("inPsi1").onchange=e=>{const v=parseFloat(e.target.value);
-  if(!isNaN(v)){S.hdPsi1=mod(v,360);drawHd();handPaint();}};
-$("btnHandA").onclick=()=>{ if(!S.hdCaptured){alert("Capture the first reading first.");return;}
-  S.handDone=true; save(); status(); alert("Handedness confirmed as assumed."); };
-$("btnHandB").onclick=()=>{ if(!S.hdCaptured){alert("Capture the first reading first.");return;}
-  S.hand=-S.hand; S.handDone=true; save(); status(); handPaint();
-  alert("Handedness flipped and saved. The Aim tab is now corrected."); };
+  if(!isNaN(v)){S.hdDial=mod(v,360);drawHd();}};
+$("selTurn").onchange=e=>{S.hdTurn=parseInt(e.target.value,10);save();handPaint();};
+$("btnHandApply").onclick=()=>{
+  if(!S.handVerdict){alert("No usable verdict yet — capture both readings first.");return;}
+  S.hand = S.handVerdict>0 ? 1 : -1;
+  S.handDone=true; save(); status(); render();
+  alert(S.hand>0 ? "Stored: handedness as assumed. Calibration complete."
+                 : "Stored: handedness mirrored. The Aim tab is now corrected.");
+};
+$("btnHandClr").onclick=()=>{
+  S.hdPsi1=null; S.hdPsi2=null; S.handVerdict=null; S.handDone=false;
+  save(); handPaint(); status();
+};
 
 /* ── north reference check: GPS course over ground vs compass ── */
 let walk=null;
@@ -1120,7 +1167,7 @@ function status(){
 }
 
 /* boot */
-$("selFrame").value=S.frame; $("selNorth").value=S.northRef;
+$("selFrame").value=S.frame; $("selNorth").value=S.northRef; $("selTurn").value=String(S.hdTurn);
 if(S.psiT!==null) S.calPsi=S.psiT;
 status(); drawCal(); drawHd(); handPaint(); render();
 setInterval(render,250);

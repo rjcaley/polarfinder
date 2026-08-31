@@ -81,38 +81,40 @@ If nothing changes no matter how you turn it, the filter is mounted backwards.
 
 ### Step 2 · Handedness *(indoors, no sun, any hour)*
 
-There are two mirror-image ways the ring could map onto the world, and Step 1 cannot tell them apart.
+There are two mirror-image ways the ring could map onto the world, and Step 1 cannot tell them apart —
+a horizontal reflector polarizes light horizontally *in the world*, from every viewing direction, so its
+geometry is symmetric. (Two earlier drafts of this step were wrong: tilting your head does nothing, and
+the version after it showed only one of the two equivalent answers.)
 
-**Why not, and why an earlier version of this test was wrong.** A horizontal reflector polarizes light
-horizontally *in the world*, and it does so no matter which direction you view it from. So the filter
-orientation that kills it is world-vertical, always. Tilting your head does not change that — the filter
-stays where it is and you read the same marking against gravity. A horizontal surface is fundamentally
-symmetric and can never resolve handedness. (An earlier draft asked you to tilt your head; it was
-wrong, and the symptom was exactly that neither candidate matched.)
+**What works: turning a screen.** Every LCD and OLED emits linearly polarized light, and the polarizer
+is bonded to the panel — so the polarization *turns with the device*.
 
-**What does work: turning a screen.** Every LCD and OLED emits linearly polarized light, and the
-polarizer is bonded to the panel — so the polarization direction *turns with the device*. Turn the
-screen and the correct filter position must turn with it, one way if the handedness is as assumed and
-the other way if it is mirrored.
+1. Plain white full-screen on a second device — tablet, spare phone, laptop. Dim the room.
+2. Hold it upright facing you, head level. Rotate the filter to the **darkest** point, set the dial to
+   the marking at the top, tap **Capture 1**.
+3. Turn the screen so its **top edge moves toward your right**, by roughly 45° — about halfway to
+   portrait. Keep the face pointed at you.
+4. Re-find the darkest point, set the dial, tap **Capture 2**. Set the turn-direction menu to match
+   what you actually did, then tap **Apply**.
 
-1. Put a plain white image full-screen on **a second device** — a tablet, spare phone, or laptop.
-   Something you can rotate in its own plane. Dim the room a little.
-2. Stand it upright facing you, arm's length. **Keep your head level.**
-3. Look through the filter, engraved face toward the screen, and rotate to the **darkest** point.
-   Set the app's second dial to the marking at the top and tap **Capture**.
-4. Rotate **the screen** 45° clockwise as you look at it — top-right corner drops toward the right.
-   Keep it facing you.
-5. Re-find the darkest filter position, read the marking at the top, tap whichever candidate matches.
+**Which way you turned it is the whole test** — get that backwards and the verdict inverts. The turn
+*amount* barely matters: anything from 20° to 70° works, and the app reports the measured rotation so
+you can check it against what you did.
 
-The maths: if the screen's polarization sits at angle α in your view, the filter must be perpendicular
-to it, so ψ₀ = ψ_T + α + 90. Turning the screen by +45° sends α → α + 45, so ψ₀ → ψ₀ + 45. **α cancels
-out** — you never need to know which way the screen's polarizer runs. Only the change matters, and it
-is +45° or −45°. The candidates land **90° apart**, and the turn need not be accurate: 30° still
-separates them by 60°.
+The maths: if the screen's polarization sits at angle α in your view, the filter must be perpendicular,
+so ψ₀ = ψ_T + α + 90. Turning the screen by δ sends α → α + δ, so ψ₀ → ψ₀ + δ. Both α and ψ_T cancel
+when you subtract the two readings — **only the sign of the change matters**.
 
-> This reading is *not* the same as ψ_T, and it isn't supposed to be — it depends on the screen's own
-> polarizer. That's why the app asks for it separately.
+> **Positions 180° apart are identical.** The transmission axis is a line, not an arrow, so rotating the
+> filter half a turn gives exactly the same optical setting. You will often find the darkest point with
+> the "other half" of the ring at the top. Enter whichever twin you actually see — the app reduces both
+> readings modulo 180° and gets the same answer either way.
 
+**What "darkest" looks like on a screen.** Expect a deep blue-grey at the minimum and a dim white at the
+maximum, not a true black. Screens carry retarder and compensation films whose effect varies with
+wavelength, so extinction is never complete and the residue is coloured. This is normal and does not
+affect the angle — the minimum is still in the right place. If the swing is so weak you cannot locate
+the minimum, try an LCD laptop screen instead of an OLED tablet.
 
 ### Declination · nothing to do, ever
 
