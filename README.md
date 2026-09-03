@@ -229,23 +229,41 @@ worth knowing, because it means further calibration effort buys you nothing.
 
 ## Troubleshooting
 
-**Pill says "relative only"** — Chrome fell back to `deviceorientation`, which is referenced to
-wherever the phone was when the page loaded, not to north. Reload the page. If it persists, wave
-the phone in a figure-eight to re-seed the magnetometer, or switch **Aim source** to *Type it in*.
+**The ring angle flips between two values that are far apart** — fixed in v5, and worth understanding
+because it was the nastiest bug in this app. Chrome on Android fires *two* orientation events:
+`deviceorientationabsolute`, which is referenced to magnetic north, and `deviceorientation`, which on
+Android is the **game rotation vector** — a relative orientation referenced to wherever the phone
+happened to be when the sensor started. Earlier versions listened to both and fed them into one
+handler, so the heading alternated between a real bearing and a meaningless one separated by an
+arbitrary constant. The symptom was distinctive: the answer snapped between two clusters with **no
+values in between**, each cluster individually rock-steady. The app now ignores relative events
+entirely once an absolute one has arrived.
 
-**Pill says "no sensor data"** — the page isn't on HTTPS, or motion access is blocked in
-Chrome's site settings.
+**Pill says "relative — not usable"** — no absolute orientation event ever arrived, so there is no
+compass at all. Reload the page. If it persists, use **Aim source → Type it in**.
 
-**Readings jump around near the camera** — that's the M's brass. Hold the phone 30cm clear of the
-body while you take the reading, then bring it back.
+**Steadiness pill is amber or red** — the answer is moving. Under ±4° it is fine. Above ±12° the app
+refuses to vouch for it, and tells you which of the two causes applies:
 
-**Sky doesn't darken at the position the app gives** — do Step 2, the head-tilt test. It's almost
-always handedness. If Step 2 is done and it's still wrong, redo Step 1 with your head deliberately
-level, then check that the app's declination reading looks sane for where you are.
+- *Magnetic disturbance* — the usual one on a rooftop. Steel decking, railings, ducting, lift
+  machinery and HVAC all bend the local field. Walk several metres clear and watch the pill settle.
+- *Geometric amplification* — you are pointed nearly at or away from the sun, where the sun's
+  projection into the frame is tiny and its direction is ill-defined. The **aim error amplification**
+  readout shows this: 1.0× at γ = 90°, but 2.9× at γ = 20° and 5.7× at γ = 10°. There is also very
+  little polarization to remove at those angles, so the honest answer is usually to leave the filter off.
 
-**Filter does nothing at all in any position** — it's mounted or held backwards.
+**A reading that looks stable but is wrong** — check the steadiness pill *and* the polarization
+percentage before trusting any answer. A confident-looking number at 15% polarization is not worth
+acting on.
 
----
+**Sky doesn't darken at the position the app gives** — do Step 2, the handedness test. If Step 2 is
+done and it is still wrong, redo Step 1 with your head deliberately level, then check that the app's
+declination reading looks sane for where you are.
+
+**Readings jump around near the camera** — that's the M's brass and steel. Use **Hold reading**: aim,
+freeze, then bring the camera up.
+
+**Filter does nothing at all in any position** — it's mounted backwards.
 
 ## The physics, in one paragraph
 

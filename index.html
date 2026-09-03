@@ -90,9 +90,14 @@ hr{border:0;border-top:1px solid var(--line);margin:12px 0}
   </div>
 
   <div class="card">
+    <div class="row" style="margin-bottom:6px">
+      <div class="grow tiny dim">Reading</div>
+      <span id="steadyPill" class="pill">—</span>
+    </div>
     <div class="big" id="instr">Waiting for position…</div>
     <div class="tiny dim" id="instr2" style="margin-top:6px"></div>
     <div class="tiny dim" id="instr3" style="margin-top:4px"></div>
+    <div class="tiny" id="steadyNote" style="margin-top:8px;color:var(--warn)"></div>
   </div>
 
   <div class="row" style="margin-bottom:10px">
@@ -109,6 +114,7 @@ hr{border:0;border-top:1px solid var(--line);margin:12px 0}
     <div class="kv"><span class="dim">Sun–subject angle γ</span><b id="kGamma" class="mono">—</b></div>
     <div class="kv"><span class="dim">Max darkening of polarized part</span><b id="kRatio" class="mono">—</b></div>
     <div class="kv"><span class="dim">Filter axis in frame</span><b id="kTheta" class="mono">—</b></div>
+    <div class="kv"><span class="dim">Aim error amplification</span><b id="kAmp" class="mono">—</b></div>
     <div class="tiny dim" id="dopNote" style="margin-top:6px"></div>
   </div>
 
@@ -619,7 +625,7 @@ const S={
   hdPsi1:null, hdPsi2:null, hdDial:0, hdTurn:1, handVerdict:null,
   northRef:"mag", walkDone:false, walkDiff:null,
   lat:null, lon:null, acc:null,
-  az:null, el:null, roll:null, absOK:false,
+  az:null, el:null, roll:null, absOK:false, aimSpread:0,
   frozen:false, frame:"level",
   aimSrc:"sensor", manAz:0, manEl:0,
   calPsi:0, ringShown:0
@@ -807,6 +813,8 @@ function paint(R){
   $("kGamma").textContent=R.gamma.toFixed(1)+"°";
   $("kTheta").textContent=R.theta.toFixed(1)+"°";
   $("kRatio").textContent=R.ratio.toFixed(1)+"×";
+  const amp=1/Math.max(Math.sin(R.gamma*D),0.02);
+  $("kAmp").textContent=amp.toFixed(2)+"×  (1° of aim → "+amp.toFixed(1)+"° of ring)";
   const pct=Math.round(R.P*100);
   $("dopBar").style.width=pct+"%";
   const pill=$("dopPill");
@@ -849,7 +857,46 @@ function paint(R){
   }
   S.ringShown=R.psiTop;
   drawRing($("ring"), R.psiTop);
+  steadiness(R);
+}
 
+/* ── how much is the ANSWER moving? ───────────────────────────────────────
+   This is the number that matters. It folds together compass jitter, magnetic
+   interference, and the geometric amplification near gamma = 0 or 180, where a
+   small aim error swings the ring a long way. A reading that will not sit still
+   must never be presented as if it were trustworthy. */
+const RBUF=[];
+function steadiness(R){
+  const now=(typeof performance!=="undefined"&&performance.now)?performance.now():Date.now();
+  if(!S.frozen){
+    RBUF.push({t:now,p:R.psiTop});
+    while(RBUF.length && now-RBUF[0].t>2000) RBUF.shift();
+  }
+  let spread=0;
+  if(RBUF.length>2){
+    const ref=RBUF[RBUF.length-1].p;
+    for(const b of RBUF){ let d=Math.abs(mod(b.p-ref,180)); spread=Math.max(spread,Math.min(d,180-d)); }
+  }
+  // geometric amplification: how far the ring moves per degree of aim error
+  const amp = 1/Math.max(Math.sin(R.gamma*D),0.02);
+  const pill=$("steadyPill"), note=$("steadyNote");
+  if(S.frozen){ pill.textContent="held"; pill.className="pill warn"; note.textContent=""; return; }
+  pill.textContent="±"+spread.toFixed(0)+"° over 2s";
+  if(spread<4){
+    pill.className="pill ok"; note.textContent="";
+  } else if(spread<12){
+    pill.className="pill warn";
+    note.textContent="The reading is wandering by ±"+spread.toFixed(0)+"°. Hold the phone still for a "+
+      "moment before tapping Hold reading.";
+  } else {
+    pill.className="pill bad";
+    note.textContent="Unstable: ±"+spread.toFixed(0)+"°. Do not trust this. "+
+      (amp>2.5
+        ? "You are pointed nearly at or away from the sun (γ="+R.gamma.toFixed(0)+"°), where 1° of aim "+
+          "error swings the ring "+amp.toFixed(1)+"°. There is also little to polarise here."
+        : "The compass is being disturbed. Step several metres away from railings, ducting, lift "+
+          "machinery and rooftop steel, or switch Aim source to “Type it in”.");
+  }
 }
 
 /* ═══════════ sensors ═══════════ */
@@ -863,17 +910,65 @@ function orientMatrix(a,b,c){
     z:[cA*sC+cC*sA*sB, sA*sC-cA*cC*sB,  cB*cC]
   };
 }
-function onOrient(e){
-  if(e.alpha===null) return;
-  S.absOK = e.absolute===true || S.absOK;
+/* ── orientation input ────────────────────────────────────────────────────
+   Chrome on Android fires TWO different events:
+     deviceorientationabsolute -> TYPE_ROTATION_VECTOR, referenced to magnetic north
+     deviceorientation         -> TYPE_GAME_ROTATION_VECTOR, RELATIVE to wherever the
+                                  phone happened to be when the sensor started
+   Listening to both and feeding them into one handler makes the heading flip
+   between a real bearing and a meaningless one, with an arbitrary constant offset
+   between them. Once an absolute event has been seen, relative ones are ignored. */
+let sawAbsolute=false;
+const OBUF=[];                      // recent samples, for smoothing
+const OWIN=1000;                    // ms of history to average over
+
+function handleOrient(e,isAbs){
+  if(e.alpha===null||e.alpha===undefined) return;
+  if(isAbs) sawAbsolute=true;
   const M=orientMatrix(e.alpha,e.beta,e.gamma);
-  const v=scl(M.z,-1);                       // rear camera looks along -z
-  S.az=mod(Math.atan2(v[0],v[1])*R2D,360);
-  S.el=Math.asin(clamp(v[2],-1,1))*R2D;
-  S.roll=M.y;                                // device "up" in world
+  let v=scl(M.z,-1);                         // rear camera looks along -z
+  let up=M.y;                                // device "up" in world
+  if(typeof e.webkitCompassHeading==="number"){   // iOS path
+    const el=Math.asin(clamp(v[2],-1,1))*R2D;
+    v=dir(mod(e.webkitCompassHeading,360),el);
+  }
+  const now=(typeof performance!=="undefined"&&performance.now)?performance.now():Date.now();
+  OBUF.push({t:now,v,up,abs:isAbs});
+  while(OBUF.length && now-OBUF[0].t>OWIN) OBUF.shift();
+  applySmoothed();
+  S.absOK=sawAbsolute;
   const p=$("sensorPill");
-  p.textContent = S.absOK? "compass live" : "relative only";
-  p.className="pill "+(S.absOK?"ok":"warn");
+  p.textContent = sawAbsolute? "compass live" : "relative — not usable";
+  p.className="pill "+(sawAbsolute?"ok":"bad");
+}
+function onOrientAbs(e){ handleOrient(e,true); }
+function onOrientAny(e){
+  const isAbs = e.absolute===true || typeof e.webkitCompassHeading==="number";
+  if(sawAbsolute && !isAbs) return;          // ← the fix: never mix in relative data
+  handleOrient(e,isAbs);
+}
+
+/* average the recent direction vectors, discarding outliers.
+   Averaging vectors rather than angles avoids the 359°/0° wrap problem. */
+function applySmoothed(){
+  if(!OBUF.length) return;
+  const mean=list=>{
+    let m=[0,0,0];
+    for(const b of list) m=[m[0]+b.v[0],m[1]+b.v[1],m[2]+b.v[2]];
+    return norm(m);
+  };
+  let m=mean(OBUF);
+  const keep=OBUF.filter(b=>dot(b.v,m)>Math.cos(20*D));
+  if(keep.length>=Math.max(3,OBUF.length*0.5)) m=mean(keep);
+  // spread of the surviving samples, in degrees — how jittery the aim is
+  let worst=0;
+  for(const b of OBUF) worst=Math.max(worst,Math.acos(clamp(dot(b.v,m),-1,1))*R2D);
+  S.aimSpread=worst;
+  S.az=mod(Math.atan2(m[0],m[1])*R2D,360);
+  S.el=Math.asin(clamp(m[2],-1,1))*R2D;
+  let u=[0,0,0];
+  for(const b of OBUF) u=[u[0]+b.up[0],u[1]+b.up[1],u[2]+b.up[2]];
+  S.roll=norm(u);
 }
 async function startSensors(){
   try{
@@ -883,17 +978,17 @@ async function startSensors(){
       if(r!=="granted"){alert("Motion permission denied.");return;}
     }
   }catch(e){}
-  window.addEventListener("deviceorientationabsolute",onOrient,true);
-  window.addEventListener("deviceorientation",onOrient,true);
+  window.addEventListener("deviceorientationabsolute",onOrientAbs,true);
+  window.addEventListener("deviceorientation",onOrientAny,true);
   getGeo();
   try{ if("wakeLock" in navigator) await navigator.wakeLock.request("screen"); }catch(e){}
   setTimeout(()=>{
     if(S.az===null){
       $("sensorPill").textContent="no sensor data";
       $("sensorPill").className="pill bad";
-    } else if(!S.absOK){
-      $("sensorPill").textContent="relative only";
-      $("sensorPill").className="pill warn";
+    } else if(!sawAbsolute){
+      $("sensorPill").textContent="relative — not usable";
+      $("sensorPill").className="pill bad";
     }
   },2500);
 }
