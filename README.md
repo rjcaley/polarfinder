@@ -227,6 +227,58 @@ worth knowing, because it means further calibration effort buys you nothing.
 
 ---
 
+## Magnetic environment
+
+The app's weakest input is the phone's compass, and the thing that ruins a compass is nearby iron.
+A **fixed** lump of iron near the phone does not shift every heading equally — it adds a constant
+vector to the Earth's field, so the heading error is *sinusoidal in heading*: zero in two directions,
+worst 90° from those. That is why a site can be perfect facing one way and badly wrong facing another.
+
+The app now measures this directly. Field **magnitude** and **dip angle** are independent of which way
+the phone is pointing, so they can be checked against the World Magnetic Model without trusting the
+heading at all. A clean site matches the model; ironwork shifts one or both.
+
+What it reports, on the Aim tab:
+
+- the measured field and dip against the model values
+- the size of the anomaly as a share of the total field
+- an **estimated heading error** in degrees
+- most usefully, **the share of maximum darkening you are still getting** — because a big anomaly at a
+  forgiving geometry can be harmless, while a modest one where the amplification is high is not
+
+The severity wording is based on that last number, not on microtesla, since that is what actually
+affects the photograph.
+
+> **On the estimate.** Magnitude and dip reveal the anomaly components along the field and in the
+> vertical plane. The horizontal-perpendicular component is what corrupts a heading, and it is not
+> directly observable. For a roughly isotropic anomaly its expected size is
+> √((a∥² + a_dip²)/2), which is what the app uses. It is an estimate, labelled as one, and it will not
+> be exact — expect it to agree with reality to within a factor of about 1.5.
+
+### Optical cross-check — your eye as the reference instrument
+
+The filter is a better polarimeter than the phone is a compass. When the app disagrees with what you
+can plainly see, the Calibrate tab lets you enter the position you actually found darkest, and works
+backwards to the heading error that would explain it.
+
+That converts a vague "it seemed off" into a number, and it distinguishes the two possibilities
+cleanly. Repeat it facing several directions:
+
+- **Error near zero in two directions, large 90° away** → local ironwork. The app is fine; the site is not.
+- **The same error in every direction** → a calibration problem. Redo Step 1, or check handedness.
+
+### What to do about a bad site
+
+Walk a few metres and watch the readings settle — the field from a lump of iron falls off as 1/r³, so
+distance is extremely effective. Rooftops are among the worst environments there are: steel decking,
+parapet railings, HVAC plant, lift machinery, and reinforcement in the slab beneath you. If the site
+cannot be improved, use **Aim source → Type it in** and give the app a bearing you trust.
+
+Keep the loss in perspective. Transmission goes as cos² of the ring error, so even a 20° error still
+delivers 88% of the ideal darkening — visible if you look for it, rarely fatal to the photograph.
+
+---
+
 ## Troubleshooting
 
 **The ring angle flips between two values that are far apart** — fixed in v5, and worth understanding

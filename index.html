@@ -116,6 +116,9 @@ hr{border:0;border-top:1px solid var(--line);margin:12px 0}
     <div class="kv"><span class="dim">Filter axis in frame</span><b id="kTheta" class="mono">—</b></div>
     <div class="kv"><span class="dim">Aim error amplification</span><b id="kAmp" class="mono">—</b></div>
     <div class="tiny dim" id="dopNote" style="margin-top:6px"></div>
+    <hr>
+    <div class="row"><div class="grow" style="font-weight:600">Magnetic environment</div><span id="magPill" class="pill">—</span></div>
+    <div class="tiny dim" id="magNote" style="margin-top:6px"></div>
   </div>
 
   <div class="card">
@@ -274,6 +277,27 @@ hr{border:0;border-top:1px solid var(--line);margin:12px 0}
     </div>
     <div class="tiny dim" style="margin-top:6px" id="wkNote">Until you run this, the app assumes magnetic
       north, which is almost certainly right for Chrome on Android.</div>
+  </div>
+
+  <div class="card">
+    <h1>Optical cross-check · your eye as the reference</h1>
+    <div class="note">The most trustworthy instrument you own for this is the filter itself. If the app's
+      answer disagrees with what you can plainly see, enter what you saw and this works backwards to the
+      heading error that would explain it — telling you how bad the site really is, in degrees.
+      <br><br>Do it on the Aim tab: get a reading, tap <b>Hold reading</b>, then find the true darkest
+      position by eye and enter it here.</div>
+    <div class="kv"><span class="dim">App said (held)</span><b id="xcApp" class="mono">—</b></div>
+    <label style="margin-top:8px">Ring position you actually found darkest</label>
+    <div class="row">
+      <input id="xcObs" type="number" step="0.5" placeholder="e.g. 5.3" class="grow">
+      <button id="btnXc" class="pri">Check</button>
+    </div>
+    <div class="kv" style="margin-top:8px"><span class="dim">Ring disagreement</span><b id="xcRing" class="mono">—</b></div>
+    <div class="kv"><span class="dim">Implied heading error</span><b id="xcHead" class="mono">—</b></div>
+    <div class="kv"><span class="dim">Darkening you got</span><b id="xcKeep" class="mono">—</b></div>
+    <div class="tiny dim" style="margin-top:6px" id="xcNote">Repeat facing several directions. A fixed
+      lump of iron gives an error that swings sinusoidally with heading — zero in two directions, worst
+      90° from those. Errors that are large in some directions and nil in others are the signature.</div>
   </div>
 
   <div class="card">
@@ -738,6 +762,79 @@ function describe(psiTop){
 }
 
 /* ═══════════ core solve ═══════════ */
+/* transmission-axis angle in the image plane, for a given aim */
+function axisAngle(s,camAz,camEl){
+  const v=dir(camAz,camEl);
+  let u;
+  if(S.frame==="phone" && S.roll!==null){
+    u=norm(sub(S.roll, scl(v,dot(S.roll,v))));
+    if(len(u)<1e-6) u=[0,0,1];
+  } else {
+    const z=[0,0,1];
+    u=norm(sub(z,scl(v,dot(z,v))));
+    if(len(u)<1e-6) u=[0,1,0];
+    if(S.frame==="port") u=norm(cross(v,u));      // rotate 90° -> portrait
+  }
+  const r=norm(cross(v,u));
+  const cosg=clamp(dot(s,v),-1,1);
+  const tv=sub(s,scl(v,cosg));
+  const t=norm(tv);
+  return {v,u,r,cosg,gamma:Math.acos(cosg)*R2D,weak:len(tv)<1e-4,
+          theta:mod(Math.atan2(dot(t,r),dot(t,u))*R2D,180)};
+}
+
+/* ═══════════ magnetic environment ═══════════
+   |B| and dip are independent of which way the phone is pointing, so they can be
+   compared against the World Magnetic Model without trusting the heading. A clean
+   site matches the model; ironwork shifts one or both. The horizontal-perpendicular
+   part of an anomaly is what actually corrupts a heading, and it is not directly
+   observable — but for a roughly isotropic anomaly its expected size is
+   sqrt((a_par^2 + a_dip^2)/2), which is what is used below. Reported as an estimate. */
+let MAG={on:false, err:null, F:null, dip:null, n:0};
+let LASTM=null;
+async function startMagnetometer(){
+  if(typeof Magnetometer==="undefined"){ MAG.err="not supported by this browser"; return; }
+  try{
+    if(navigator.permissions){
+      const p=await navigator.permissions.query({name:"magnetometer"});
+      if(p.state==="denied"){ MAG.err="permission denied"; return; }
+    }
+  }catch(e){}
+  try{
+    const m=new Magnetometer({frequency:8});
+    m.addEventListener("error",e=>{ MAG.err=(e.error&&e.error.name)||"sensor error"; MAG.on=false; });
+    m.addEventListener("reading",()=>{
+      if(!LASTM) return;
+      const b=[m.x,m.y,m.z];
+      if(b[0]===null||b[0]===undefined) return;
+      // device frame -> world (columns of the orientation matrix are the device axes)
+      const w=[ b[0]*LASTM.x[0]+b[1]*LASTM.y[0]+b[2]*LASTM.z[0],
+                b[0]*LASTM.x[1]+b[1]*LASTM.y[1]+b[2]*LASTM.z[1],
+                b[0]*LASTM.x[2]+b[1]*LASTM.y[2]+b[2]*LASTM.z[2] ];
+      const F=Math.hypot(w[0],w[1],w[2]);
+      const hor=Math.hypot(w[0],w[1]);
+      const dip=Math.atan2(-w[2],hor)*R2D;
+      const k=MAG.n<5?0.4:0.12;                      // settle fast, then smooth
+      MAG.F   = MAG.F===null? F   : MAG.F  +k*(F-MAG.F);
+      MAG.dip = MAG.dip===null? dip : MAG.dip+k*(dip-MAG.dip);
+      MAG.n++; MAG.on=true; MAG.err=null;
+    });
+    m.start();
+  }catch(e){ MAG.err=(e&&e.name)||"unavailable"; }
+}
+/* returns null if we cannot judge, else the disturbance assessment */
+function magnetics(){
+  const wf=declinationNow();
+  if(!wf) return null;
+  const F0=wf.f/1000, I0=wf.inc, H0=wf.h/1000;
+  if(!MAG.on||MAG.F===null) return {known:false,err:MAG.err,F0,I0,H0};
+  const aPar=MAG.F-F0;
+  const aDip=F0*(MAG.dip-I0)*D;
+  const seen=Math.hypot(aPar,aDip);
+  const aPerp=Math.sqrt((aPar*aPar+aDip*aDip)/2);
+  const headErr=Math.atan2(aPerp,H0)*R2D;
+  return {known:true,F0,I0,H0,F:MAG.F,dip:MAG.dip,aPar,aDip,seen,headErr};
+}
 function solve(){
   const now=new Date();
   const lat=S.lat, lon=S.lon;
@@ -755,27 +852,15 @@ function solve(){
   const s=dir(sp.az,sp.alt);
   const v=dir(camAz,camEl);
 
-  // camera up vector
-  let u;
-  if(S.frame==="phone" && S.roll!==null){
-    u=norm(sub(S.roll, scl(v,dot(S.roll,v))));
-    if(len(u)<1e-6) u=[0,0,1];
-  } else {
-    const z=[0,0,1];
-    u=norm(sub(z,scl(v,dot(z,v))));
-    if(len(u)<1e-6) u=[0,1,0];
-    if(S.frame==="port") u=norm(cross(v,u)); // rotate 90° -> portrait
-  }
-  const r=norm(cross(v,u));
+  const q=axisAngle(s,camAz,camEl);
+  const {u,r,cosg,gamma,weak,theta}=q;
 
-  const cosg=clamp(dot(s,v),-1,1);
-  const gamma=Math.acos(cosg)*R2D;
-
-  // transmission axis = sun projected into image plane
-  const tv=sub(s,scl(v,cosg));
-  const weak=len(tv)<1e-4;
-  const t=norm(tv);
-  const theta=mod(Math.atan2(dot(t,r),dot(t,u))*R2D,180); // clockwise from up, mod 180
+  /* How far does the ring move per degree of heading error, HERE?
+     Computed numerically rather than from 1/sin(gamma) — that approximation is
+     the worst case over all perturbation directions and can be out by 2x for a
+     pure azimuth error, which is the error we actually have. */
+  const th1=axisAngle(s,camAz+0.5,camEl).theta, th2=axisAngle(s,camAz-0.5,camEl).theta;
+  const amp=Math.abs(mod(th1-th2+90,180)-90);
 
   const Pmax=0.75, sg=Math.sin(gamma*D);
   const P=Pmax*sg*sg/(1+cosg*cosg);
@@ -784,7 +869,7 @@ function solve(){
   let psiTop=null;
   if(S.psiT!==null) psiTop=mod(S.psiT + S.hand*theta, 180);
 
-  return {sp,camAz,camEl,gamma,theta,P,ratio,psiTop,weak,sunUp:sp.alt>-0.9};
+  return {sp,camAz,camEl,gamma,theta,P,ratio,psiTop,weak,amp,sunUp:sp.alt>-0.9};
 }
 
 /* ═══════════ render ═══════════ */
@@ -813,8 +898,7 @@ function paint(R){
   $("kGamma").textContent=R.gamma.toFixed(1)+"°";
   $("kTheta").textContent=R.theta.toFixed(1)+"°";
   $("kRatio").textContent=R.ratio.toFixed(1)+"×";
-  const amp=1/Math.max(Math.sin(R.gamma*D),0.02);
-  $("kAmp").textContent=amp.toFixed(2)+"×  (1° of aim → "+amp.toFixed(1)+"° of ring)";
+  $("kAmp").textContent=R.amp.toFixed(2)+"×  (1° of heading error → "+R.amp.toFixed(1)+"° of ring)";
   const pct=Math.round(R.P*100);
   $("dopBar").style.width=pct+"%";
   const pill=$("dopPill");
@@ -858,6 +942,41 @@ function paint(R){
   S.ringShown=R.psiTop;
   drawRing($("ring"), R.psiTop);
   steadiness(R);
+  magPaint(R);
+}
+
+/* live magnetic-environment verdict, in units that matter: degrees of ring
+   error, and the share of the ideal darkening that survives it (Malus, cos²) */
+function magPaint(R){
+  const m=magnetics(), pill=$("magPill"), note=$("magNote");
+  if(!m){ pill.textContent="needs GPS"; pill.className="pill"; note.textContent=""; return; }
+  if(!m.known){
+    pill.textContent="unmeasured"; pill.className="pill";
+    note.textContent="No magnetometer reading ("+(m.err||"starting up")+
+      "). The app cannot tell whether this site is magnetically clean.";
+    return;
+  }
+  const ringErr=m.headErr*R.amp;
+  const keep=100*Math.cos(clamp(ringErr,0,90)*D)**2;
+  const anomPct=100*m.seen/m.F0;
+  /* Severity is judged on what it costs you, not on microtesla. A big field
+     anomaly at a forgiving geometry can be harmless; a modest one where the
+     amplification is high is not. */
+  let level, word;
+  if(keep>=97){ level="ok";   word="fine here"; }
+  else if(keep>=90){ level="warn"; word="slight loss"; }
+  else { level="bad"; word="significant loss"; }
+  pill.textContent=word+" · ~"+keep.toFixed(0)+"% of max";
+  pill.className="pill "+level;
+  note.innerHTML=
+    "Field here <b>"+m.F.toFixed(1)+" µT</b> vs model <b>"+m.F0.toFixed(1)+"</b> ("+
+    (m.aPar>=0?"+":"")+m.aPar.toFixed(1)+"), dip <b>"+m.dip.toFixed(1)+"°</b> vs <b>"+
+    m.I0.toFixed(1)+"°</b> ("+(m.dip-m.I0>=0?"+":"")+(m.dip-m.I0).toFixed(1)+"°). "+
+    "Anomaly "+anomPct.toFixed(0)+"% of the total field → estimated heading error <b>±"+
+    m.headErr.toFixed(0)+"°</b>, which at this geometry ("+R.amp.toFixed(2)+
+    "× amplification) is <b>±"+ringErr.toFixed(0)+"° of ring</b> and leaves about <b>"+
+    keep.toFixed(0)+"%</b> of the maximum darkening."+
+    (level==="bad"? " <b>Walk away from the ironwork and watch this settle.</b>":"");
 }
 
 /* ── how much is the ANSWER moving? ───────────────────────────────────────
@@ -878,7 +997,7 @@ function steadiness(R){
     for(const b of RBUF){ let d=Math.abs(mod(b.p-ref,180)); spread=Math.max(spread,Math.min(d,180-d)); }
   }
   // geometric amplification: how far the ring moves per degree of aim error
-  const amp = 1/Math.max(Math.sin(R.gamma*D),0.02);
+  const amp = R.amp;
   const pill=$("steadyPill"), note=$("steadyNote");
   if(S.frozen){ pill.textContent="held"; pill.className="pill warn"; note.textContent=""; return; }
   pill.textContent="±"+spread.toFixed(0)+"° over 2s";
@@ -926,6 +1045,7 @@ function handleOrient(e,isAbs){
   if(e.alpha===null||e.alpha===undefined) return;
   if(isAbs) sawAbsolute=true;
   const M=orientMatrix(e.alpha,e.beta,e.gamma);
+  LASTM=M;
   let v=scl(M.z,-1);                         // rear camera looks along -z
   let up=M.y;                                // device "up" in world
   if(typeof e.webkitCompassHeading==="number"){   // iOS path
@@ -981,6 +1101,7 @@ async function startSensors(){
   window.addEventListener("deviceorientationabsolute",onOrientAbs,true);
   window.addEventListener("deviceorientation",onOrientAny,true);
   getGeo();
+  startMagnetometer();
   try{ if("wakeLock" in navigator) await navigator.wakeLock.request("screen"); }catch(e){}
   setTimeout(()=>{
     if(S.az===null){
@@ -1222,6 +1343,46 @@ $("btnWalkClr").onclick=()=>{
   save(); status();
 };
 $("selNorth").onchange=e=>{S.northRef=e.target.value;save();status();};
+
+/* optical cross-check: infer the heading error from what the eye actually saw */
+$("btnXc").onclick=()=>{
+  const R=lastSolve;
+  if(!R||R.psiTop===null||R.psiTop===undefined){alert("Get a reading on the Aim tab first.");return;}
+  const obs=parseFloat($("xcObs").value);
+  if(isNaN(obs)){alert("Enter the ring position you found darkest.");return;}
+  let dRing=Math.abs(mod(obs-R.psiTop,180)); dRing=Math.min(dRing,180-dRing);
+  const dHead=R.amp>0.05? dRing/R.amp : NaN;
+  const keep=100*Math.cos(clamp(dRing,0,90)*D)**2;
+  $("xcApp").textContent=R.psiTop.toFixed(1)+"°  ("+describe(R.psiTop).main+")";
+  $("xcRing").textContent=dRing.toFixed(1)+"°";
+  $("xcHead").textContent=isNaN(dHead)?"—":dHead.toFixed(0)+"°  (amplification "+R.amp.toFixed(2)+"×)";
+  $("xcKeep").textContent=keep.toFixed(0)+"% of maximum";
+  const m=magnetics();
+  $("xcNote").textContent =
+    dRing<8 ? "Agreement within "+dRing.toFixed(0)+"° — about as good as this instrument gets. Nothing wrong here."
+    : "A "+dRing.toFixed(0)+"° ring disagreement implies about "+dHead.toFixed(0)+"° of heading error"+
+      (m&&m.known? ", against "+m.headErr.toFixed(0)+"° estimated from the field measurement." : ".")+
+      " You still captured "+keep.toFixed(0)+"% of the available darkening. Repeat facing other "+
+      "directions: if the error swings from near zero to large and back, it is local ironwork, not the app.";
+};
+
+/* camera interference check */
+let ifA=null, ifB=null;
+function ifPaint(){
+  $("ifA").textContent = ifA===null? "—" : ifA.toFixed(1)+"°";
+  $("ifB").textContent = ifB===null? "—" : ifB.toFixed(1)+"°";
+  if(ifA===null||ifB===null){ $("ifD").textContent="—"; return; }
+  const d=mod(ifB-ifA+180,360)-180, a=Math.abs(d);
+  $("ifD").textContent=(d>=0?"+":"")+d.toFixed(1)+"°";
+  $("ifNote").textContent = a<3
+    ? "Under 3° — the camera is not meaningfully disturbing the compass. Hold it however you like."
+    : a<8
+    ? a.toFixed(0)+"° — noticeable. Keep the M at arm's length while you take the reading, then use "+
+      "Hold reading and go to the lens."
+    : a.toFixed(0)+"° — large. Take every reading with the camera set down or fully at arm's length.";
+}
+$("btnIfA").onclick=()=>{ if(S.az===null){alert("No compass reading yet.");return;} ifA=S.az; ifPaint(); };
+$("btnIfB").onclick=()=>{ if(S.az===null){alert("No compass reading yet.");return;} ifB=S.az; ifPaint(); };
 
 $("inOff").onchange=e=>{S.off=parseFloat(e.target.value)||0;save();status();};
 $("inLat").onchange=e=>{S.lat=parseFloat(e.target.value);save();};
