@@ -251,9 +251,37 @@ affects the photograph.
 
 > **On the estimate.** Magnitude and dip reveal the anomaly components along the field and in the
 > vertical plane. The horizontal-perpendicular component is what corrupts a heading, and it is not
-> directly observable. For a roughly isotropic anomaly its expected size is
-> √((a∥² + a_dip²)/2), which is what the app uses. It is an estimate, labelled as one, and it will not
-> be exact — expect it to agree with reality to within a factor of about 1.5.
+> directly observable. For a roughly isotropic anomaly its expected size is √((a∥² + a_dip²)/2), which
+> is what the app uses. A 20,000-sample Monte Carlo puts the median of estimated/true at **1.14** —
+> essentially unbiased — but only **52% of cases land within a factor of two**, with a 10th–90th
+> percentile range of 0.34× to 4.9×. It is an order-of-magnitude indicator, not a measurement. The
+> optical cross-check is the number to trust.
+
+### If your phone has no magnetometer API
+
+Chrome does not expose raw magnetometer readings unless `chrome://flags/#enable-generic-sensor-extra-classes`
+is switched on, so on most phones the field-strength comparison above is unavailable and the app says
+so. It falls back to a method that needs no special API at all.
+
+The phone publishes **two independent orientations**:
+
+| Event | Sensors behind it | Magnetically |
+|---|---|---|
+| `deviceorientationabsolute` | gyro + accelerometer + **magnetometer** | vulnerable |
+| `deviceorientation` | gyro + accelerometer only (game rotation vector) | **immune** |
+
+In a clean field the difference between the two headings is a constant. Where iron distorts the
+field, that difference **changes as you turn or walk** — and the size of that change is the heading
+error you are actually suffering. Sweep the phone through 30–40°, or walk a few paces, and the app
+reports it.
+
+The noise floor is the gyroscope's own drift, roughly 2–3° over the 30-second window, so anything
+under about 5° reads as clean.
+
+> **Blind spot, stated plainly.** A distortion that is *identical in every direction over the whole
+> area* moves both headings together and stays invisible to this test. That is exactly the case the
+> optical site correction below exists to handle — and it is the likeliest case on a steel-framed
+> roof.
 
 ### Why the magnetometer cannot simply correct itself
 
@@ -307,6 +335,90 @@ cannot be improved, use **Aim source → Type it in** and give the app a bearing
 
 Keep the loss in perspective. Transmission goes as cos² of the ring error, so even a 20° error still
 delivers 88% of the ideal darkening — visible if you look for it, rarely fatal to the photograph.
+
+---
+
+## Staleness — why a reading can go wrong after a journey
+
+If you take a reading, pocket the phone, travel, and look again without reopening the app, the answer
+can be badly wrong. The cause is not what it looks like.
+
+**It is not the stale GPS fix.** Position barely matters over city distances:
+
+| Distance from the true position | Ring error it causes |
+|---|---:|
+| 1 km | 0.01° |
+| 15 km (across a city) | 0.10° |
+| 40 km | 0.27° |
+| 150 km | 0.96° |
+| 1000 km | 7.6° |
+
+**It is the heading.** When the page is backgrounded, Chrome freezes it: orientation events stop
+arriving and the geolocation watch goes quiet. On resume the app could still be holding the heading it
+measured *before* the journey — and 1° of heading error is worth up to 3° of ring, so a heading from
+the other side of town is worth nothing at all. Reopening the app silently cured it because that
+restarted the sensor session.
+
+Four fixes, all verified:
+
+1. **Every orientation sample is timestamped.** If the compass has not spoken for 2 seconds the app
+   says **"Compass has stopped updating"**, states the age of the last reading, and refuses to present
+   it as an answer.
+2. **Resume rebuilds everything.** On `visibilitychange`, `pageshow` and `focus`, the app detaches and
+   re-attaches the orientation listeners (forcing a fresh sensor session), discards every smoothing
+   buffer that could hold pre-journey samples, clears the old geolocation watch and requests a new
+   high-accuracy fix.
+3. **Hold reading cannot survive a journey.** The freeze is released automatically on resume, so a
+   reading taken somewhere else can never masquerade as a live one.
+4. **Site correction fails safe.** It now requires a position fix known to be current (under 3
+   minutes). A stale fix would otherwise keep a correction alive after you had left the site it was
+   measured at — and *that* error is large. The position is also no longer saved between sessions, so
+   a fresh launch can never start with an old location.
+
+---
+
+## Independent verification
+
+Every quantitative claim was re-derived from scratch and checked against implementations that share
+no code with the app.
+
+| What | Checked against | Result |
+|---|---|---|
+| Solar position | **pvlib** (NREL SPA reference), 152 sun-up cases worldwide | max error **0.013°** |
+| Transmission-axis angle | Rayleigh **Stokes/Mueller** model, polarizer angle found by brute-force intensity minimisation, 400 geometries | max **0.005°** |
+| Scattering angle γ | same | max 5×10⁻¹⁴° |
+| DoP law sin²γ/(1+cos²γ) | same | max 6×10⁻¹⁶ |
+| **End-to-end instruction** | virtual filter, front-view ring geometry, 150 geometries | **100.0000%** of ideal darkening |
+| Orientation matrix | independent Rz·Rx·Ry composition, 200 orientations | 1.7×10⁻¹⁶ |
+| Aim amplification | exact derivative (0.01° step) | p95 error 0.0002 |
+| Brightest:darkest ratio | Stokes I_max/I_min | exact |
+| cos² retention law | Stokes | exact |
+| Declination | **pygeomag** (independent WMM implementation), 4,000 global points | 1.1×10⁻¹³° |
+| Declination sign | standard convention, three known locations | correct |
+
+The end-to-end test is the one that matters: it simulates the physical filter, applies the app's
+instruction, and confirms the result is the true intensity minimum. A control run with the handedness
+deliberately flipped achieves only 54.6%, so the test genuinely discriminates.
+
+**Re-verified after the staleness changes:** solar 0.0132°, orientation matrix 1.7×10⁻¹⁶,
+end-to-end instruction 100.0000% of ideal darkening, axis angle vs Stokes 0.005°, sky-compass
+inversion 0.0000° worst error among unflagged sharp fixes. Fifteen staleness and fail-safe behaviours
+tested separately, all passing.
+
+**Faults found and fixed by these audits:**
+
+1. **Sky-compass inversion could pick the wrong branch.** θ is not one-to-one in azimuth — several
+   headings can produce the same polarization angle. The code took the global minimum residual, which
+   could land on a distant branch: worst observed error **107.9°**, silently. It now finds every root,
+   takes the one nearest the compass heading, and flags ambiguity. Worst error among unflagged sharp
+   fixes is now **0.000°**. The threshold for saving a site correction was raised from 0.2× to 0.5×
+   amplification, because soft fixes could still be 28° out.
+2. **A mislabelled row.** "Max darkening of polarized part" was actually the brightest:darkest
+   transmission ratio. The number was right; the label was not. Renamed.
+
+**Assumption, not a measurement:** the sky's peak degree of polarization is taken as P_max = 0.75.
+Real skies run roughly 0.7–0.8 in clean air and lower in haze. This affects the strength meter and the
+ratio only — **not the angle the app tells you to set**.
 
 ---
 

@@ -112,7 +112,7 @@ hr{border:0;border-top:1px solid var(--line);margin:12px 0}
     </div>
     <div class="bar"><i id="dopBar" style="width:0%"></i></div>
     <div class="kv"><span class="dim">Sun–subject angle γ</span><b id="kGamma" class="mono">—</b></div>
-    <div class="kv"><span class="dim">Max darkening of polarized part</span><b id="kRatio" class="mono">—</b></div>
+    <div class="kv"><span class="dim">Brightest : darkest ratio</span><b id="kRatio" class="mono">—</b></div>
     <div class="kv"><span class="dim">Filter axis in frame</span><b id="kTheta" class="mono">—</b></div>
     <div class="kv"><span class="dim">Aim error amplification</span><b id="kAmp" class="mono">—</b></div>
     <div class="tiny dim" id="dopNote" style="margin-top:6px"></div>
@@ -671,7 +671,7 @@ const S={
   hdPsi1:null, hdPsi2:null, hdDial:0, hdTurn:1, handVerdict:null,
   northRef:"mag", walkDone:false, walkDiff:null, siteFix:null,
   lat:null, lon:null, acc:null,
-  az:null, el:null, roll:null, absOK:false, aimSpread:0,
+  az:null, el:null, roll:null, absOK:false, aimSpread:0, geoLive:false,
   frozen:false, frame:"level",
   aimSrc:"sensor", manAz:0, manEl:0,
   calPsi:0, ringShown:0
@@ -681,7 +681,7 @@ function save(){
     psiT:S.psiT, off:S.off, hand:S.hand, handDone:S.handDone,
     hdPsi1:S.hdPsi1, hdPsi2:S.hdPsi2, hdTurn:S.hdTurn,
     northRef:S.northRef, walkDone:S.walkDone, walkDiff:S.walkDiff, siteFix:S.siteFix,
-    lat:S.lat, lon:S.lon, frame:S.frame
+    frame:S.frame
   }));
 }
 /* declination here and now, from the embedded WMM2025 */
@@ -811,19 +811,42 @@ function axisAngle(s,camAz,camEl){
    determines the azimuth you are facing. Inverting it turns the filter into an
    independent heading reference — which is the only thing that can rescue a site the
    magnetometer is lying about. Viking sunstones worked on the same principle. */
+/* theta is NOT one-to-one in azimuth: several branches can produce the same
+   observed polarisation angle. Taking the global minimum residual can land on a
+   far branch and be wildly wrong. Collect every root, take the one nearest the
+   compass heading (the compass is wrong, but not usually by a lot), and report
+   whether a rival root is close enough to be confusable. */
 function headingFromAxis(s,camEl,thetaObs,guessAz){
-  let best=null;
-  for(let az=guessAz-80; az<=guessAz+80; az+=0.5){
+  const SPAN=70, STEP=0.25;
+  const resid=az=>{
     const th=axisAngle(s,mod(az,360),camEl).theta;
-    let d=Math.abs(mod(th-thetaObs,180)); d=Math.min(d,180-d);
-    if(!best||d<best.d) best={d,az:mod(az,360)};
+    let d=Math.abs(mod(th-thetaObs,180)); return Math.min(d,180-d);
+  };
+  // sample, then locate local minima of the residual
+  const xs=[], ds=[];
+  for(let a=guessAz-SPAN; a<=guessAz+SPAN; a+=STEP){ xs.push(a); ds.push(resid(a)); }
+  const roots=[];
+  for(let i=1;i<xs.length-1;i++){
+    if(ds[i]<=ds[i-1] && ds[i]<=ds[i+1] && ds[i]<2.0){
+      // refine this minimum
+      let lo=xs[i]-STEP, hi=xs[i]+STEP;
+      for(let k=0;k<60;k++){
+        const m1=lo+(hi-lo)/3, m2=hi-(hi-lo)/3;
+        if(resid(m1)<resid(m2)) hi=m2; else lo=m1;
+      }
+      const az=(lo+hi)/2;
+      const d=resid(az);
+      if(d<0.5 && !roots.some(r=>Math.abs(r.raw-az)<1)) roots.push({raw:az,az:mod(az,360),d});
+    }
   }
-  for(let az=best.az-1; az<=best.az+1; az+=0.02){   // refine
-    const th=axisAngle(s,mod(az,360),camEl).theta;
-    let d=Math.abs(mod(th-thetaObs,180)); d=Math.min(d,180-d);
-    if(d<best.d) best={d,az:mod(az,360)};
-  }
-  return best;
+  if(!roots.length){ const az=mod(guessAz,360); return {az,d:resid(guessAz),roots:[],ambiguous:false,offset:0}; }
+  roots.sort((a,b)=>Math.abs(a.raw-guessAz)-Math.abs(b.raw-guessAz));
+  const pick=roots[0];
+  const rival=roots[1];
+  const off=mod(pick.az-guessAz+180,360)-180;
+  return {az:pick.az, d:pick.d, offset:off, roots,
+          ambiguous: !!rival && Math.abs(Math.abs(rival.raw-guessAz)-Math.abs(pick.raw-guessAz))<25,
+          rivalOffset: rival? mod(rival.az-guessAz+180,360)-180 : null};
 }
 function metresBetween(a,b){
   const R=6371000, D2=Math.PI/180;
@@ -834,9 +857,13 @@ function metresBetween(a,b){
 /* the stored correction applies only near where it was taken */
 function siteOffset(){
   const f=S.siteFix;
-  if(!f||S.lat===null) return {off:0,active:false,fix:f,dist:null};
+  if(!f||S.lat===null) return {off:0,active:false,fix:f,dist:null,stale:false};
+  /* Fail safe: a stale position would keep a correction alive after you have
+     left the site it was measured at, which is a large error. Only a fix we
+     know is current may enable it. */
+  if(!S.geoLive || geoAge()>GEO_STALE) return {off:0,active:false,fix:f,dist:null,stale:true};
   const dist=metresBetween({lat:S.lat,lon:S.lon},{lat:f.lat,lon:f.lon});
-  return {off: dist<=SITE_RADIUS? f.off : 0, active: dist<=SITE_RADIUS, fix:f, dist};
+  return {off: dist<=SITE_RADIUS? f.off : 0, active: dist<=SITE_RADIUS, fix:f, dist, stale:false};
 }
 const SITE_RADIUS=60;   // metres
 
@@ -940,9 +967,25 @@ function render(){
 }
 function paint(R){
   $("kTime").textContent=new Date().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit",second:"2-digit"});
+  // is the compass actually still talking to us?
+  const stale = S.aimSrc==="sensor" && orientAge()>ORIENT_STALE;
+  const sp0=$("sensorPill");
+  if(stale){
+    sp0.textContent="compass asleep"; sp0.className="pill bad";
+    $("instr").textContent="Compass has stopped updating";
+    $("instr2").textContent="The last reading is "+(orientAge()/1000).toFixed(0)+
+      "s old, so it may be from somewhere else entirely.";
+    $("instr3").textContent="Move the phone, or tap Enable sensors to restart it.";
+    $("steadyPill").textContent="stale"; $("steadyPill").className="pill bad";
+    $("steadyNote").textContent="Readings are not live. Nothing below can be trusted until this clears.";
+    drawRing($("ring"), S.ringShown);
+    return;
+  }
   $("ifLive").textContent = S.az===null? "—" : S.az.toFixed(1)+"°";
   $("kPos").textContent = S.lat===null? "no fix" :
-     S.lat.toFixed(3)+"°, "+S.lon.toFixed(3)+"°"+(S.acc?" ±"+Math.round(S.acc)+"m":"");
+     S.lat.toFixed(3)+"°, "+S.lon.toFixed(3)+"°"+(S.acc?" ±"+Math.round(S.acc)+"m":"")+
+     (geoAge()===Infinity? " (typed)" : geoAge()>GEO_STALE? "  ⚠ "+(geoAge()/60000).toFixed(0)+" min old"
+        : "  ·  "+(geoAge()/1000).toFixed(0)+"s ago");
   if(!R){
     $("instr").textContent = S.lat===null? "Need a GPS fix" : "Need a compass reading";
     $("instr2").textContent = S.lat===null? "Tap Use GPS in Calibrate, or type a location."
@@ -1005,43 +1048,10 @@ function paint(R){
 
 /* live magnetic-environment verdict, in units that matter: degrees of ring
    error, and the share of the ideal darkening that survives it (Malus, cos²) */
-function magPaint(R){
-  const m=magnetics(), pill=$("magPill"), note=$("magNote");
-  if(!m){ pill.textContent="needs GPS"; pill.className="pill"; note.textContent=""; return; }
-  if(!m.known){
-    pill.textContent="unmeasured"; pill.className="pill";
-    note.textContent="No magnetometer reading ("+(m.err||"starting up")+
-      "). The app cannot tell whether this site is magnetically clean.";
-    return;
-  }
-  const ringErr=m.headErr*R.amp;
-  const keep=100*Math.cos(clamp(ringErr,0,90)*D)**2;
-  const anomPct=100*m.seen/m.F0;
-  /* Severity is judged on what it costs you, not on microtesla. A big field
-     anomaly at a forgiving geometry can be harmless; a modest one where the
-     amplification is high is not. */
-  let level, word;
-  if(keep>=97){ level="ok";   word="fine here"; }
-  else if(keep>=90){ level="warn"; word="slight loss"; }
-  else { level="bad"; word="significant loss"; }
-  pill.textContent=word+" · ~"+keep.toFixed(0)+"% of max";
-  pill.className="pill "+level;
-  note.innerHTML=
-    "Field here <b>"+m.F.toFixed(1)+" µT</b> vs model <b>"+m.F0.toFixed(1)+"</b> ("+
-    (m.aPar>=0?"+":"")+m.aPar.toFixed(1)+"), dip <b>"+m.dip.toFixed(1)+"°</b> vs <b>"+
-    m.I0.toFixed(1)+"°</b> ("+(m.dip-m.I0>=0?"+":"")+(m.dip-m.I0).toFixed(1)+"°). "+
-    "Anomaly "+anomPct.toFixed(0)+"% of the total field → estimated heading error <b>±"+
-    m.headErr.toFixed(0)+"°</b>, which at this geometry ("+R.amp.toFixed(2)+
-    "× amplification) is <b>±"+ringErr.toFixed(0)+"° of ring</b> and leaves about <b>"+
-    keep.toFixed(0)+"%</b> of the maximum darkening."+
-    (level==="bad"? " <b>Walk away from the ironwork and watch this settle.</b>":"");
-}
-
 /* ── how much is the ANSWER moving? ───────────────────────────────────────
-   This is the number that matters. It folds together compass jitter, magnetic
-   interference, and the geometric amplification near gamma = 0 or 180, where a
-   small aim error swings the ring a long way. A reading that will not sit still
-   must never be presented as if it were trustworthy. */
+   Folds together compass jitter, magnetic interference, and the geometric
+   amplification near gamma = 0 or 180. A reading that will not sit still must
+   never be presented as if it were trustworthy. */
 const RBUF=[];
 function steadiness(R){
   const now=(typeof performance!=="undefined"&&performance.now)?performance.now():Date.now();
@@ -1054,14 +1064,12 @@ function steadiness(R){
     const ref=RBUF[RBUF.length-1].p;
     for(const b of RBUF){ let d=Math.abs(mod(b.p-ref,180)); spread=Math.max(spread,Math.min(d,180-d)); }
   }
-  // geometric amplification: how far the ring moves per degree of aim error
-  const amp = R.amp;
+  const amp=R.amp;
   const pill=$("steadyPill"), note=$("steadyNote");
   if(S.frozen){ pill.textContent="held"; pill.className="pill warn"; note.textContent=""; return; }
   pill.textContent="±"+spread.toFixed(0)+"° over 2s";
-  if(spread<4){
-    pill.className="pill ok"; note.textContent="";
-  } else if(spread<12){
+  if(spread<4){ pill.className="pill ok"; note.textContent=""; }
+  else if(spread<12){
     pill.className="pill warn";
     note.textContent="The reading is wandering by ±"+spread.toFixed(0)+"°. Hold the phone still for a "+
       "moment before tapping Hold reading.";
@@ -1074,6 +1082,52 @@ function steadiness(R){
         : "The compass is being disturbed. Step several metres away from railings, ducting, lift "+
           "machinery and rooftop steel, or switch Aim source to “Type it in”.");
   }
+}
+
+function magPaint(R){
+  const m=magnetics(), pill=$("magPill"), note=$("magNote");
+  if(!m){ pill.textContent="needs GPS"; pill.className="pill"; note.textContent=""; return; }
+
+  if(m.known){                     // raw magnetometer available (rare — needs a Chrome flag)
+    const ringErr=m.headErr*R.amp, keep=100*Math.cos(clamp(ringErr,0,90)*D)**2;
+    const anomPct=100*m.seen/m.F0;
+    let level = keep>=97?"ok" : keep>=90?"warn":"bad";
+    pill.textContent=(keep>=97?"fine here":keep>=90?"slight loss":"significant loss")+
+      " · ~"+keep.toFixed(0)+"% of max";
+    pill.className="pill "+level;
+    note.innerHTML="Field <b>"+m.F.toFixed(1)+" µT</b> vs model <b>"+m.F0.toFixed(1)+
+      "</b>, dip <b>"+m.dip.toFixed(1)+"°</b> vs <b>"+m.I0.toFixed(1)+"°</b>. Anomaly "+
+      anomPct.toFixed(0)+"% of the field → est. heading error <b>±"+m.headErr.toFixed(0)+
+      "°</b> → <b>±"+ringErr.toFixed(0)+"° of ring</b>, about <b>"+keep.toFixed(0)+"%</b> of maximum darkening.";
+    return;
+  }
+
+  /* Fallback that works on any phone: compare the magnetic heading against the
+     gyro/accelerometer heading, which no amount of iron can affect. */
+  const f=fieldConsistency();
+  if(!f.ready){
+    pill.textContent="measuring…"; pill.className="pill";
+    note.textContent="Comparing the compass against the phone's gyroscope. Move the phone around for a few seconds.";
+    return;
+  }
+  if(f.coverage<20){
+    pill.textContent="turn to test"; pill.className="pill";
+    note.textContent="Sweep the phone slowly through 30–40° of heading (or walk a few paces) and this "+
+      "will fill in. So far you have covered "+f.coverage.toFixed(0)+"°.";
+    return;
+  }
+  const ringErr=f.spread*R.amp, keep=100*Math.cos(clamp(ringErr,0,90)*D)**2;
+  const level = f.spread<5?"ok" : f.spread<12?"warn":"bad";
+  pill.textContent=(f.spread<5?"consistent":f.spread<12?"some distortion":"strong distortion")+
+    " · ~"+keep.toFixed(0)+"% of max";
+  pill.className="pill "+level;
+  note.innerHTML="Compass vs gyroscope disagree by <b>"+f.spread.toFixed(0)+
+    "°</b> across the "+f.coverage.toFixed(0)+"° you have covered"+
+    (f.spread<5? " — around the 2–3° drift floor of the gyro, so this site looks clean."
+      : ". That is real magnetic distortion → <b>±"+ringErr.toFixed(0)+"° of ring</b>, about <b>"+
+        keep.toFixed(0)+"%</b> of maximum darkening.")+
+    " <span class='dim'>A distortion that is identical in every direction cannot be seen this way — "+
+    "use the optical site correction for that.</span>";
 }
 
 /* ═══════════ sensors ═══════════ */
@@ -1102,6 +1156,7 @@ const OWIN=1000;                    // ms of history to average over
 function handleOrient(e,isAbs){
   if(e.alpha===null||e.alpha===undefined) return;
   if(isAbs) sawAbsolute=true;
+  lastOrientT=nowMs();
   const M=orientMatrix(e.alpha,e.beta,e.gamma);
   LASTM=M;
   let v=scl(M.z,-1);                         // rear camera looks along -z
@@ -1115,6 +1170,7 @@ function handleOrient(e,isAbs){
   while(OBUF.length && now-OBUF[0].t>OWIN) OBUF.shift();
   applySmoothed();
   S.absOK=sawAbsolute;
+  if(isAbs){ FUSE.abs={t:now,h:mod(Math.atan2(v[0],v[1])*R2D,360)}; pairFuse(now); }
   const p=$("sensorPill");
   p.textContent = sawAbsolute? "compass live" : "relative — not usable";
   p.className="pill "+(sawAbsolute?"ok":"bad");
@@ -1122,8 +1178,59 @@ function handleOrient(e,isAbs){
 function onOrientAbs(e){ handleOrient(e,true); }
 function onOrientAny(e){
   const isAbs = e.absolute===true || typeof e.webkitCompassHeading==="number";
-  if(sawAbsolute && !isAbs) return;          // ← the fix: never mix in relative data
-  handleOrient(e,isAbs);
+  if(sawAbsolute && !isAbs){ noteRelative(e); return; }  // never steers the aim…
+  handleOrient(e,isAbs);                                  // …but it is not wasted
+}
+
+/* ── magnetic disturbance WITHOUT the Magnetometer API ────────────────────
+   Chrome does not expose raw magnetometer readings unless a flag is set, so
+   comparing field strength against the model is usually unavailable. But the
+   phone publishes two independent orientations:
+     deviceorientationabsolute -> gyro + accel + MAGNETOMETER
+     deviceorientation         -> gyro + accel only (game rotation vector)
+   The second is magnetically immune. In a clean field the difference between
+   the two headings is a constant. Where iron distorts the field, that difference
+   CHANGES as you turn or walk — and the size of the change is the heading error
+   you are actually suffering.
+
+   Blind spot, stated plainly: a perfectly uniform offset over the whole area
+   moves both headings together and stays invisible here. That case is what the
+   optical site correction exists for. */
+const FUSE={abs:null, rel:null, buf:[]};
+function headingOf(e){
+  const M=orientMatrix(e.alpha,e.beta,e.gamma);
+  const v=scl(M.z,-1);
+  return mod(Math.atan2(v[0],v[1])*R2D,360);
+}
+function noteRelative(e){
+  if(e.alpha===null||e.alpha===undefined) return;
+  const now=(typeof performance!=="undefined"&&performance.now)?performance.now():Date.now();
+  FUSE.rel={t:now,h:headingOf(e)};
+  pairFuse(now);
+}
+function pairFuse(now){
+  if(!FUSE.abs||!FUSE.rel) return;
+  if(Math.abs(FUSE.abs.t-FUSE.rel.t)>150) return;
+  FUSE.buf.push({t:now, d:mod(FUSE.abs.h-FUSE.rel.h+180,360)-180, h:FUSE.abs.h});
+  while(FUSE.buf.length && now-FUSE.buf[0].t>30000) FUSE.buf.shift();
+  if(FUSE.buf.length>900) FUSE.buf.splice(0,FUSE.buf.length-900);
+}
+/* returns how much the magnetic heading disagrees with the inertial one across
+   the directions you have actually visited recently */
+function fieldConsistency(){
+  const b=FUSE.buf;
+  if(b.length<20) return {ready:false,reason:"waiting for both sensors"};
+  // angular coverage of headings sampled
+  let minH=999,maxH=-999;
+  const ref=b[b.length-1].h;
+  for(const x of b){ const rel=mod(x.h-ref+180,360)-180; minH=Math.min(minH,rel); maxH=Math.max(maxH,rel); }
+  const coverage=maxH-minH;
+  // spread of the abs-vs-inertial difference, unwrapped about the median
+  const ds=b.map(x=>x.d).slice().sort((p,q)=>p-q);
+  const med=ds[Math.floor(ds.length/2)];
+  let lo=999,hi=-999;
+  for(const x of b){ const u=mod(x.d-med+180,360)-180; lo=Math.min(lo,u); hi=Math.max(hi,u); }
+  return {ready:true, coverage, spread:hi-lo, n:b.length};
 }
 
 /* average the recent direction vectors, discarding outliers.
@@ -1148,6 +1255,38 @@ function applySmoothed(){
   for(const b of OBUF) u=[u[0]+b.up[0],u[1]+b.up[1],u[2]+b.up[2]];
   S.roll=norm(u);
 }
+/* ── freshness bookkeeping ────────────────────────────────────────────────
+   Carrying the phone in a pocket freezes the page: orientation events stop and
+   the geolocation watch goes quiet. On resume the app could otherwise still be
+   holding a heading measured before the journey — which looks perfectly normal
+   and is completely wrong. Everything time-sensitive is now stamped and checked. */
+let lastOrientT=0, lastGeoT=0, geoWatch=null, wakeLock=null, listenersOn=false;
+const nowMs=()=>(typeof performance!=="undefined"&&performance.now)?performance.now():Date.now();
+function orientAge(){ return lastOrientT? nowMs()-lastOrientT : Infinity; }
+function geoAge(){ return lastGeoT? nowMs()-lastGeoT : Infinity; }
+const ORIENT_STALE=2000;      // ms — a live compass updates many times a second
+const GEO_STALE=180000;       // ms — position may legitimately be a few minutes old
+
+function attachOrientation(){
+  if(listenersOn) return;
+  window.addEventListener("deviceorientationabsolute",onOrientAbs,true);
+  window.addEventListener("deviceorientation",onOrientAny,true);
+  listenersOn=true;
+}
+function detachOrientation(){
+  window.removeEventListener("deviceorientationabsolute",onOrientAbs,true);
+  window.removeEventListener("deviceorientation",onOrientAny,true);
+  listenersOn=false;
+}
+/* discard every buffer that could contain pre-journey samples */
+function flushSensorHistory(){
+  OBUF.length=0; RBUF.length=0; FUSE.buf.length=0;
+  FUSE.abs=null; FUSE.rel=null;
+  MAG.F=null; MAG.dip=null; MAG.n=0;
+  S.az=null; S.el=null; S.roll=null; S.aimSpread=0;
+  lastOrientT=0; lastSolve=null;
+}
+
 async function startSensors(){
   try{
     if(typeof DeviceOrientationEvent!=="undefined" &&
@@ -1156,11 +1295,10 @@ async function startSensors(){
       if(r!=="granted"){alert("Motion permission denied.");return;}
     }
   }catch(e){}
-  window.addEventListener("deviceorientationabsolute",onOrientAbs,true);
-  window.addEventListener("deviceorientation",onOrientAny,true);
+  attachOrientation();
   getGeo();
   startMagnetometer();
-  try{ if("wakeLock" in navigator) await navigator.wakeLock.request("screen"); }catch(e){}
+  try{ if("wakeLock" in navigator) wakeLock=await navigator.wakeLock.request("screen"); }catch(e){}
   setTimeout(()=>{
     if(S.az===null){
       $("sensorPill").textContent="no sensor data";
@@ -1171,14 +1309,44 @@ async function startSensors(){
     }
   },2500);
 }
-function getGeo(){
+function getGeo(force){
   if(!navigator.geolocation) return;
-  navigator.geolocation.watchPosition(p=>{
+  if(geoWatch!==null){ navigator.geolocation.clearWatch(geoWatch); geoWatch=null; }
+  const take=p=>{
     S.lat=p.coords.latitude; S.lon=p.coords.longitude; S.acc=p.coords.accuracy;
+    lastGeoT=nowMs(); S.geoLive=true;
     $("inLat").value=S.lat.toFixed(5); $("inLon").value=S.lon.toFixed(5);
     save();
-  },()=>{},{enableHighAccuracy:false,maximumAge:120000,timeout:15000});
+  };
+  // a brand-new fix first, then keep watching
+  navigator.geolocation.getCurrentPosition(take,()=>{},
+    {enableHighAccuracy:true, maximumAge: force?0:15000, timeout:20000});
+  geoWatch=navigator.geolocation.watchPosition(take,()=>{},
+    {enableHighAccuracy:false, maximumAge:15000, timeout:25000});
 }
+
+/* ── resume: rebuild everything that could be stale ─────────────────────── */
+async function onResume(){
+  detachOrientation();            // force a fresh sensor session
+  flushSensorHistory();
+  attachOrientation();
+  getGeo(true);
+  startMagnetometer();
+  if(S.frozen){                   // never let a held reading survive a journey
+    S.frozen=false;
+    $("btnFreeze").textContent="Hold reading";
+    $("btnFreeze").classList.remove("hot");
+    $("ringCard").classList.remove("frozen");
+  }
+  try{ if("wakeLock" in navigator && !wakeLock) wakeLock=await navigator.wakeLock.request("screen"); }catch(e){}
+  render();
+}
+document.addEventListener("visibilitychange",()=>{
+  if(document.visibilityState==="visible"){ onResume(); }
+  else { wakeLock=null; }
+});
+window.addEventListener("pageshow",e=>{ if(e.persisted) onResume(); });
+window.addEventListener("focus",()=>{ if(orientAge()>ORIENT_STALE*3) onResume(); });
 
 /* ═══════════ calibration dial ═══════════ */
 function drawCal(){
@@ -1416,7 +1584,7 @@ $("btnXc").onclick=()=>{
   const s=dir(R.sp.az,R.sp.alt);
   const thetaObs=mod((mod(obs,180)-S.psiT)*S.hand,180);
   const inv=headingFromAxis(s,R.camEl,thetaObs,R.camAz);
-  const dHead=mod(inv.az-R.camAz+180,360)-180;
+  const dHead=inv.offset;
 
   $("xcApp").textContent=R.psiTop.toFixed(1)+"°  ("+describe(R.psiTop).main+")";
   $("xcRing").textContent=dRing.toFixed(1)+"°";
@@ -1428,18 +1596,23 @@ $("btnXc").onclick=()=>{
   const q=$("xcQual");
   const headPerRing = R.amp>0.02? 1/R.amp : 999;
   let qual;
-  if(R.amp>=0.5){ qual="ok";  q.textContent="sharp · ±"+(2*headPerRing).toFixed(0)+"°"; }
-  else if(R.amp>=0.2){ qual="warn"; q.textContent="soft · ±"+(2*headPerRing).toFixed(0)+"°"; }
+  if(R.amp>=0.5 && !inv.ambiguous){ qual="ok"; q.textContent="sharp · ±"+(2*headPerRing).toFixed(0)+"°"; }
+  else if(inv.ambiguous){ qual="bad"; q.textContent="ambiguous"; }
   else { qual="bad"; q.textContent="too vague to use"; }
   q.className="pill "+qual;
-  xcResult = qual==="bad"? null : {off:dHead, lat:S.lat, lon:S.lon, amp:R.amp};
+  xcResult = qual==="ok"? {off:dHead, lat:S.lat, lon:S.lon, amp:R.amp} : null;
 
   const m=magnetics();
   $("xcNote").textContent =
-    qual==="bad"
-      ? "At this aim the ring barely responds to heading (amplification "+R.amp.toFixed(2)+"×), so the "+
-        "sky cannot pin down which way you are facing. Turn to a direction where the app shows higher "+
-        "amplification and try again."
+    inv.ambiguous
+      ? "Two different headings would produce the polarisation angle you saw ("+
+        (dHead>=0?"+":"")+dHead.toFixed(0)+"° and "+(inv.rivalOffset>=0?"+":"")+
+        inv.rivalOffset.toFixed(0)+"°), and they are too close together to choose between. "+
+        "Turn to face a different direction and take the fix there."
+    : qual==="bad"
+      ? "At this aim the ring barely responds to heading (amplification "+R.amp.toFixed(2)+
+        "×, needs 0.50×), so the sky cannot pin down which way you are facing. Turn to a "+
+        "direction where the app shows higher amplification and try again."
     : dRing<8
       ? "Agreement within "+dRing.toFixed(0)+"° — about as good as this instrument gets. No correction needed."
       : "Implies the compass is off by "+dHead.toFixed(0)+"° here"+
@@ -1448,8 +1621,9 @@ $("btnXc").onclick=()=>{
         "correction and every other direction from this spot is corrected too.";
 };
 $("btnSite").onclick=()=>{
-  if(!xcResult){alert("Run a usable cross-check first — the fix must be taken facing a high-amplification direction.");return;}
-  if(S.lat===null){alert("Need a GPS fix to anchor the correction to this spot.");return;}
+  if(!xcResult){alert("No usable fix yet. The cross-check must come out SHARP — face a direction where the app shows amplification of at least 0.50×, and where the result is not ambiguous.");return;}
+  if(S.lat===null||!S.geoLive||geoAge()>GEO_STALE){
+    alert("Need a current GPS fix to anchor the correction to this spot. Wait for the position age on the Aim tab to read a few seconds.");return;}
   S.siteFix={off:+xcResult.off.toFixed(2), lat:S.lat, lon:S.lon, t:Date.now(), amp:+xcResult.amp.toFixed(2)};
   save(); status(); render();
   alert("Site correction saved: "+(xcResult.off>=0?"+":"")+xcResult.off.toFixed(1)+
@@ -1513,6 +1687,7 @@ function status(){
   $("siteVal").textContent = S.siteFix? ((S.siteFix.off>=0?"+":"")+S.siteFix.off.toFixed(1)+
       "°  (taken at amplification "+(S.siteFix.amp||0).toFixed(2)+"×)") : "none";
   if(!S.siteFix){ sp2.textContent="not set"; sp2.className="pill"; }
+  else if(so.stale){ sp2.textContent="suspended · position stale"; sp2.className="pill warn"; }
   else if(S.lat===null){ sp2.textContent="no GPS"; sp2.className="pill warn"; }
   else if(so.active){ sp2.textContent="active · "+so.dist.toFixed(0)+" m away"; sp2.className="pill ok"; }
   else { sp2.textContent="off · "+(so.dist>9999?">10 km":so.dist.toFixed(0)+" m away"); sp2.className="pill warn"; }
