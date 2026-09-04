@@ -52,6 +52,7 @@ label{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.0
 .pill.bad{color:var(--hot);border-color:#7f1d1d}
 .pill.warn{color:var(--warn);border-color:#78350f}
 svg{display:block;width:100%;height:auto;touch-action:none}
+#ring{width:70%;margin:0 auto}
 .tabs{display:flex;gap:6px;margin:8px 0}
 .tabs button{flex:1;padding:9px;font-size:14px}
 .note{font-size:13px;color:var(--dim);line-height:1.5}
@@ -973,8 +974,10 @@ function paint(R){
   if(stale){
     sp0.textContent="compass asleep"; sp0.className="pill bad";
     $("instr").textContent="Compass has stopped updating";
-    $("instr2").textContent="The last reading is "+(orientAge()/1000).toFixed(0)+
-      "s old, so it may be from somewhere else entirely.";
+    $("instr2").textContent = isFinite(orientAge())
+      ? "The last reading is "+(orientAge()/1000).toFixed(0)+
+        "s old, so it may be from somewhere else entirely."
+      : "No compass data has arrived yet.";
     $("instr3").textContent="Move the phone, or tap Enable sensors to restart it.";
     $("steadyPill").textContent="stale"; $("steadyPill").className="pill bad";
     $("steadyNote").textContent="Readings are not live. Nothing below can be trusted until this clears.";
@@ -1085,49 +1088,57 @@ function steadiness(R){
 }
 
 function magPaint(R){
-  const m=magnetics(), pill=$("magPill"), note=$("magNote");
-  if(!m){ pill.textContent="needs GPS"; pill.className="pill"; note.textContent=""; return; }
+  const pill=$("magPill"), note=$("magNote"), m=magnetics();
 
-  if(m.known){                     // raw magnetometer available (rare — needs a Chrome flag)
-    const ringErr=m.headErr*R.amp, keep=100*Math.cos(clamp(ringErr,0,90)*D)**2;
-    const anomPct=100*m.seen/m.F0;
-    let level = keep>=97?"ok" : keep>=90?"warn":"bad";
-    pill.textContent=(keep>=97?"fine here":keep>=90?"slight loss":"significant loss")+
-      " · ~"+keep.toFixed(0)+"% of max";
+  // headline builder shared by both measurement paths
+  const verdict=(headErr,detail)=>{
+    const ringErr=headErr*R.amp, loss=lossPct(ringErr);
+    let word,level,advice;
+    if(loss<3){ word="Site is fine"; level="ok"; advice="Use the app normally."; }
+    else if(loss<10){ word="Slight loss"; level="ok"; advice="Fine to use — the error is smaller than your ability to see it."; }
+    else if(loss<25){ word="Noticeable loss"; level="warn";
+      advice="Usable, but take a site correction on the Calibrate tab, or set the filter by eye."; }
+    else { word="DO NOT USE HERE"; level="bad";
+      advice="The compass is too disturbed at this spot. Set the filter by eye, take a site correction, "+
+             "or move several metres and re-test."; }
+    pill.textContent=word+" · −"+loss.toFixed(0)+"%";
     pill.className="pill "+level;
-    note.innerHTML="Field <b>"+m.F.toFixed(1)+" µT</b> vs model <b>"+m.F0.toFixed(1)+
-      "</b>, dip <b>"+m.dip.toFixed(1)+"°</b> vs <b>"+m.I0.toFixed(1)+"°</b>. Anomaly "+
-      anomPct.toFixed(0)+"% of the field → est. heading error <b>±"+m.headErr.toFixed(0)+
-      "°</b> → <b>±"+ringErr.toFixed(0)+"° of ring</b>, about <b>"+keep.toFixed(0)+"%</b> of maximum darkening.";
+    note.innerHTML="<b style='font-size:15px'>Up to −"+loss.toFixed(0)+"% of maximum darkness</b><br>"+
+      "Compass off by up to <b>±"+headErr.toFixed(0)+"°</b> here → <b>±"+ringErr.toFixed(0)+
+      "°</b> on the ring (×"+R.amp.toFixed(2)+" at this aim) → you keep <b>"+
+      (100-loss).toFixed(0)+"%</b> of the darkening a perfect setting would give.<br>"+
+      "<b>"+advice+"</b><br><span class='dim'>"+detail+"</span>";
+  };
+
+  if(m && m.known){                                  // raw magnetometer (needs a Chrome flag)
+    verdict(m.headErr, "From the field itself: "+m.F.toFixed(1)+" µT vs model "+m.F0.toFixed(1)+
+      ", dip "+m.dip.toFixed(1)+"° vs "+m.I0.toFixed(1)+"°.");
     return;
   }
 
-  /* Fallback that works on any phone: compare the magnetic heading against the
-     gyro/accelerometer heading, which no amount of iron can affect. */
   const f=fieldConsistency();
   if(!f.ready){
     pill.textContent="measuring…"; pill.className="pill";
-    note.textContent="Comparing the compass against the phone's gyroscope. Move the phone around for a few seconds.";
+    note.textContent="Comparing the compass against the gyroscope, which iron cannot affect. "+
+      "Sweep the phone slowly through half a circle.";
     return;
   }
-  if(f.coverage<20){
-    pill.textContent="turn to test"; pill.className="pill";
-    note.textContent="Sweep the phone slowly through 30–40° of heading (or walk a few paces) and this "+
-      "will fill in. So far you have covered "+f.coverage.toFixed(0)+"°.";
+  const NEED=120;
+  if(f.coverage<NEED){
+    pill.textContent="sweep "+Math.max(0,Math.round(NEED-f.coverage))+"° more";
+    pill.className="pill warn";
+    note.innerHTML="<b>Turn slowly through about a third of a circle.</b><br>Covered <b>"+
+      f.coverage.toFixed(0)+"°</b> of the "+NEED+"° needed ("+Math.round(100*f.coverage/NEED)+
+      "%). Below that the measurement is not reliable enough to quote — a 30° sweep can be wrong "+
+      "by over 100°.";
     return;
   }
-  const ringErr=f.spread*R.amp, keep=100*Math.cos(clamp(ringErr,0,90)*D)**2;
-  const level = f.spread<5?"ok" : f.spread<12?"warn":"bad";
-  pill.textContent=(f.spread<5?"consistent":f.spread<12?"some distortion":"strong distortion")+
-    " · ~"+keep.toFixed(0)+"% of max";
-  pill.className="pill "+level;
-  note.innerHTML="Compass vs gyroscope disagree by <b>"+f.spread.toFixed(0)+
-    "°</b> across the "+f.coverage.toFixed(0)+"° you have covered"+
-    (f.spread<5? " — around the 2–3° drift floor of the gyro, so this site looks clean."
-      : ". That is real magnetic distortion → <b>±"+ringErr.toFixed(0)+"° of ring</b>, about <b>"+
-        keep.toFixed(0)+"%</b> of maximum darkening.")+
-    " <span class='dim'>A distortion that is identical in every direction cannot be seen this way — "+
-    "use the optical site correction for that.</span>";
+  const conf = f.se<Infinity && f.se<0.5*Math.max(f.A,1)? "±"+f.se.toFixed(0)+"°" : "uncertain";
+  verdict(f.A,
+    "Measured by sweeping "+f.coverage.toFixed(0)+"°: the compass disagrees with the gyroscope by "+
+    "an amplitude of "+f.A.toFixed(1)+"° ("+conf+"), residual noise "+f.rms.toFixed(1)+"°. "+
+    "A distortion that is identical in every direction cannot be seen this way — the optical site "+
+    "correction covers that case.");
 }
 
 /* ═══════════ sensors ═══════════ */
@@ -1211,27 +1222,78 @@ function noteRelative(e){
 function pairFuse(now){
   if(!FUSE.abs||!FUSE.rel) return;
   if(Math.abs(FUSE.abs.t-FUSE.rel.t)>150) return;
-  FUSE.buf.push({t:now, d:mod(FUSE.abs.h-FUSE.rel.h+180,360)-180, h:FUSE.abs.h});
+  /* Regress against the GYRO heading, not the magnetic one. The magnetic
+     heading is itself distorted by the very error being measured, and using it
+     as the independent variable biases the estimate low — badly so when the
+     distortion is large, which is exactly when it matters. The gyro heading has
+     an arbitrary constant offset, which only shifts the fitted phase. */
+  FUSE.buf.push({t:now, d:mod(FUSE.abs.h-FUSE.rel.h+180,360)-180, h:FUSE.rel.h});
   while(FUSE.buf.length && now-FUSE.buf[0].t>30000) FUSE.buf.shift();
   if(FUSE.buf.length>900) FUSE.buf.splice(0,FUSE.buf.length-900);
 }
-/* returns how much the magnetic heading disagrees with the inertial one across
-   the directions you have actually visited recently */
+function invSym(A){                 // inverse of a small square matrix
+  const n=A.length;
+  const M=A.map((r,i)=>r.concat(Array.from({length:n},(_,j)=>i===j?1:0)));
+  for(let c=0;c<n;c++){
+    let p=c; for(let r=c+1;r<n;r++) if(Math.abs(M[r][c])>Math.abs(M[p][c])) p=r;
+    if(Math.abs(M[p][c])<1e-12) return null;
+    [M[c],M[p]]=[M[p],M[c]];
+    const d=M[c][c];
+    for(let k=0;k<2*n;k++) M[c][k]/=d;
+    for(let r=0;r<n;r++){ if(r===c) continue;
+      const f=M[r][c];
+      for(let k=0;k<2*n;k++) M[r][k]-=f*M[c][k];
+    }
+  }
+  return M.map(r=>r.slice(n));
+}
+
+/* ── how badly is iron bending the compass here? ──────────────────────────
+   The magnetic heading minus the inertial heading behaves as
+        d(psi) = c + A·sin(psi − psi0) + drift·t + noise
+   c is unknowable (the gyro's zero is arbitrary), so a perfectly uniform
+   offset stays invisible. A — the heading-DEPENDENT amplitude, the hard-iron
+   signature — is recoverable by least squares on [1, cos psi, sin psi, t],
+   with the time term absorbing gyro drift. Peak-to-peak spread, which this
+   replaces, understates A on a short sweep and measures 2A on a long one. */
 function fieldConsistency(){
   const b=FUSE.buf;
-  if(b.length<20) return {ready:false,reason:"waiting for both sensors"};
-  // angular coverage of headings sampled
-  let minH=999,maxH=-999;
+  if(b.length<30) return {ready:false, coverage:0};
   const ref=b[b.length-1].h;
-  for(const x of b){ const rel=mod(x.h-ref+180,360)-180; minH=Math.min(minH,rel); maxH=Math.max(maxH,rel); }
+  let minH=1e9,maxH=-1e9;
+  for(const x of b){ const r=mod(x.h-ref+180,360)-180; minH=Math.min(minH,r); maxH=Math.max(maxH,r); }
   const coverage=maxH-minH;
-  // spread of the abs-vs-inertial difference, unwrapped about the median
+  const t0=b[0].t;
   const ds=b.map(x=>x.d).slice().sort((p,q)=>p-q);
   const med=ds[Math.floor(ds.length/2)];
-  let lo=999,hi=-999;
-  for(const x of b){ const u=mod(x.d-med+180,360)-180; lo=Math.min(lo,u); hi=Math.max(hi,u); }
-  return {ready:true, coverage, spread:hi-lo, n:b.length};
+  const rows=b.map(x=>{
+    const ps=x.h*D;
+    return {X:[1,Math.cos(ps),Math.sin(ps),(x.t-t0)/1000], y:mod(x.d-med+180,360)-180};
+  });
+  const n=4, XtX=Array.from({length:n},()=>new Array(n).fill(0)), Xty=new Array(n).fill(0);
+  for(const r of rows){
+    for(let i=0;i<n;i++){ Xty[i]+=r.X[i]*r.y; for(let j=0;j<n;j++) XtX[i][j]+=r.X[i]*r.X[j]; }
+  }
+  const inv=invSym(XtX.map(r=>r.slice()));
+  if(!inv) return {ready:false, coverage};
+  const coef=new Array(n).fill(0);
+  for(let i=0;i<n;i++) for(let j=0;j<n;j++) coef[i]+=inv[i][j]*Xty[j];
+  let ss=0;
+  for(const r of rows){ let f=0; for(let i=0;i<n;i++) f+=coef[i]*r.X[i]; ss+=(r.y-f)*(r.y-f); }
+  const dof=Math.max(rows.length-n,1), s2=ss/dof;
+  const A=Math.hypot(coef[1],coef[2]);
+  let se=Infinity;
+  if(A>1e-9){
+    const g=[0,coef[1]/A,coef[2]/A,0];
+    let q=0; for(let i=0;i<n;i++) for(let j=0;j<n;j++) q+=g[i]*inv[i][j]*g[j];
+    se=Math.sqrt(Math.max(q,0)*s2);
+  }
+  return {ready:true, coverage, A, se, rms:Math.sqrt(s2), n:rows.length};
 }
+/* the only number that matters: share of the achievable darkening you lose.
+   kept = cos²(ring error), so loss = sin²(ring error) — and, usefully, this
+   does not depend on the assumed degree of polarisation. */
+const lossPct=ringErrDeg=>100*Math.sin(clamp(Math.abs(ringErrDeg),0,90)*D)**2;
 
 /* average the recent direction vectors, discarding outliers.
    Averaging vectors rather than angles avoids the 359°/0° wrap problem. */

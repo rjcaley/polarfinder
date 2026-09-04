@@ -257,6 +257,52 @@ affects the photograph.
 > percentile range of 0.34× to 4.9×. It is an order-of-magnitude indicator, not a measurement. The
 > optical cross-check is the number to trust.
 
+### The site check — one number, in units you can act on
+
+On the Aim tab the magnetic environment reports **the share of maximum darkness you lose**, and
+nothing else you have to interpret.
+
+**Sweep the phone slowly through about a third of a circle**, then read the verdict:
+
+| Reading | Meaning |
+|---|---|
+| **Site is fine · −0%** | Use normally |
+| **Slight loss · −6%** | Fine — smaller than you can see |
+| **Noticeable loss · −19%** | Usable, but take a site correction or set by eye |
+| **DO NOT USE HERE · −47%** | Set the filter by eye, or move several metres and re-test |
+
+**Where the percentage comes from.** With the ring off by ε from optimum, Stokes gives transmitted
+intensity T(ε) = ½I(1 − P·cos 2ε). The share of the removable glare you actually remove is
+
+> (T_max − T(ε)) / (T_max − T_min) = **cos²ε**,  so **loss = sin²ε**
+
+Verified against direct Stokes calculation at every angle. Two things worth noting: the loss is
+**independent of P**, so it does not inherit the P_max = 0.75 assumption; and it is forgiving —
+10° of ring error costs 3%, 20° costs 12%, 30° costs 25%.
+
+**Where the heading error comes from.** The magnetic heading minus the gyro heading behaves as
+
+> d(ψ) = c + A·sin(ψ − ψ₀) + drift·t + noise
+
+c is unknowable (the gyro's zero is arbitrary), so a perfectly uniform offset stays invisible. A — the
+heading-dependent amplitude, the hard-iron signature — is recovered by least squares on
+[1, cos ψ, sin ψ, t], the time term absorbing gyro drift. Ring error = A × amplification at your
+current aim, and the amplification is computed live because it varies from 0.05× to 3× with direction.
+
+**Three things this audit corrected:**
+
+1. **Peak-to-peak spread was a bad estimator.** It understates A on a short sweep and measures 2A on a
+   long one — for a true A of 25° it returned 6° at 20° coverage and 51° at 360°. Replaced by the fit.
+2. **The regression used the wrong variable.** Regressing against the *magnetic* heading biases the
+   result low, because that heading is itself distorted by the error being measured — a true 70°
+   amplitude came back as 46°, under-reporting exactly when it matters most. It now regresses against
+   the gyro heading, whose arbitrary offset only shifts the fitted phase.
+3. **Short sweeps were quoted as if reliable.** A 30° sweep can be wrong by over 100°. The app now
+   requires **120°** and shows how much more to turn.
+
+After those fixes, recovery across amplitudes of 5° to 75° is within **0.4°**, with a noise floor of
+about 1° on a clean site.
+
 ### If your phone has no magnetometer API
 
 Chrome does not expose raw magnetometer readings unless `chrome://flags/#enable-generic-sensor-extra-classes`
@@ -379,46 +425,59 @@ Four fixes, all verified:
 
 ## Independent verification
 
-Every quantitative claim was re-derived from scratch and checked against implementations that share
-no code with the app.
+Every quantitative claim is checked against implementations that share no code with the app, plus an
+end-to-end simulation of the physical filter. Re-run against the shipping build:
 
-| What | Checked against | Result |
+| Check | Method | Result |
 |---|---|---|
-| Solar position | **pvlib** (NREL SPA reference), 152 sun-up cases worldwide | max error **0.013°** |
-| Transmission-axis angle | Rayleigh **Stokes/Mueller** model, polarizer angle found by brute-force intensity minimisation, 400 geometries | max **0.005°** |
-| Scattering angle γ | same | max 5×10⁻¹⁴° |
-| DoP law sin²γ/(1+cos²γ) | same | max 6×10⁻¹⁶ |
-| **End-to-end instruction** | virtual filter, front-view ring geometry, 150 geometries | **100.0000%** of ideal darkening |
+| Solar position | pvlib (NREL SPA reference) | max **0.0138°** with the sun above 5° |
+| Declination | pygeomag (independent WMM), 600 global points, matched altitude | **5.7×10⁻¹⁴°** |
 | Orientation matrix | independent Rz·Rx·Ry composition, 200 orientations | 1.7×10⁻¹⁶ |
-| Aim amplification | exact derivative (0.01° step) | p95 error 0.0002 |
-| Brightest:darkest ratio | Stokes I_max/I_min | exact |
-| cos² retention law | Stokes | exact |
-| Declination | **pygeomag** (independent WMM implementation), 4,000 global points | 1.1×10⁻¹³° |
-| Declination sign | standard convention, three known locations | correct |
+| Transmission-axis angle | Rayleigh Stokes/Mueller, brute-force intensity minimisation | max **0.0049°** |
+| **End-to-end instruction** | virtual filter, front-view ring geometry, 200 geometries | **100.0000%** of ideal darkening |
+| Loss law | sin² vs Stokes, every degree 0–90° | 2.8×10⁻¹⁴ |
+| Sky-compass inversion | 4,000 round trips, sharp fixes | **0.0000°** worst unflagged |
+| Disturbance estimator | synthetic sweeps, amplitudes 5–75° | within **0.4°** |
 
-The end-to-end test is the one that matters: it simulates the physical filter, applies the app's
-instruction, and confirms the result is the true intensity minimum. A control run with the handedness
-deliberately flipped achieves only 54.6%, so the test genuinely discriminates.
+**Robustness, on the shipping build:**
 
-**Re-verified after the staleness changes:** solar 0.0132°, orientation matrix 1.7×10⁻¹⁶,
-end-to-end instruction 100.0000% of ideal darkening, axis angle vs Stokes 0.005°, sky-compass
-inversion 0.0000° worst error among unflagged sharp fixes. Fifteen staleness and fail-safe behaviours
-tested separately, all passing.
+- 5,000 randomised states driving the real UI — **0 crashes**, no NaN/undefined/Infinity reaching the
+  screen, all invariants held (ψ₀ ∈ [0,360), θ ∈ [0,180), γ ∈ [0,180], P ∈ [0,0.75], amplification ≥ 0,
+  ratio ≥ 1)
+- 11 exact degeneracies — camera at zenith and nadir, observer at both poles, longitude exactly 180°,
+  looking straight at and straight away from the sun, sun at zenith, sun below horizon, uncalibrated
+  filter, no GPS — all handled
+- 720 ring angles rendered, no malformed transforms
+- Held reading stable across 50 repaints × 200 aims, zero drift
+- Static: parses clean, no undefined identifiers, no duplicate DOM ids, every referenced id exists
 
-**Faults found and fixed by these audits:**
+**Faults found and fixed across the audits:**
 
-1. **Sky-compass inversion could pick the wrong branch.** θ is not one-to-one in azimuth — several
-   headings can produce the same polarization angle. The code took the global minimum residual, which
-   could land on a distant branch: worst observed error **107.9°**, silently. It now finds every root,
-   takes the one nearest the compass heading, and flags ambiguity. Worst error among unflagged sharp
-   fixes is now **0.000°**. The threshold for saving a site correction was raised from 0.2× to 0.5×
-   amplification, because soft fixes could still be 28° out.
-2. **A mislabelled row.** "Max darkening of polarized part" was actually the brightest:darkest
-   transmission ratio. The number was right; the label was not. Renamed.
+1. **Both orientation event streams were being used**, so the heading alternated between a real bearing
+   and Android's relative game-rotation-vector — the rooftop symptom of two clusters with nothing in
+   between. Relative events are now ignored once an absolute one arrives.
+2. **Sky-compass inversion picked the wrong branch.** θ is not one-to-one in azimuth; the global
+   minimum residual could land on a distant root — worst case 107.9°, silently. Now finds every root,
+   takes the nearest to the compass, flags ambiguity, and requires 0.5× amplification.
+3. **Stale sensor data survived backgrounding.** A heading measured before a journey was presented as
+   current. Everything time-sensitive is now stamped, and resume rebuilds the sensor session.
+4. **Disturbance estimator used peak-to-peak spread**, which understates on short sweeps and measures
+   2A on long ones; and it **regressed against the distorted magnetic heading**, under-reporting a true
+   70° as 46°. Now a least-squares fit against the gyro heading, requiring 120° of sweep.
+5. **Amplification used 1/sin γ**, the worst case over all perturbation directions — off by ~2× for the
+   pure heading errors that actually occur. Now a numerical derivative.
+6. **A mislabelled row** — "max darkening of polarized part" was the brightest:darkest ratio.
+7. **"Infinity s old"** shown before any compass data arrived.
 
-**Assumption, not a measurement:** the sky's peak degree of polarization is taken as P_max = 0.75.
-Real skies run roughly 0.7–0.8 in clean air and lower in haze. This affects the strength meter and the
-ratio only — **not the angle the app tells you to set**.
+**Known limits, stated rather than hidden:**
+
+- Solar refraction differs from pvlib by up to 0.64° with the sun within 2° of the horizon — a
+  genuinely model-dependent quantity there. Above 5° the agreement is 0.0138°. The app declines to work
+  with the sun that low anyway.
+- P_max = 0.75 is an assumption, not a measurement. It affects the strength meter and the
+  brightest:darkest ratio — **not the angle**, and not the loss percentage.
+- A magnetic distortion that is uniform in every direction is invisible to the sweep test. The optical
+  site correction is the answer to that case.
 
 ---
 
