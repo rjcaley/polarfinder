@@ -293,11 +293,33 @@ hr{border:0;border-top:1px solid var(--line);margin:12px 0}
       <button id="btnXc" class="pri">Check</button>
     </div>
     <div class="kv" style="margin-top:8px"><span class="dim">Ring disagreement</span><b id="xcRing" class="mono">—</b></div>
-    <div class="kv"><span class="dim">Implied heading error</span><b id="xcHead" class="mono">—</b></div>
+    <div class="kv"><span class="dim">True heading, from the sky</span><b id="xcTrue" class="mono">—</b></div>
+    <div class="kv"><span class="dim">Compass was off by</span><b id="xcHead" class="mono">—</b></div>
     <div class="kv"><span class="dim">Darkening you got</span><b id="xcKeep" class="mono">—</b></div>
-    <div class="tiny dim" style="margin-top:6px" id="xcNote">Repeat facing several directions. A fixed
-      lump of iron gives an error that swings sinusoidally with heading — zero in two directions, worst
-      90° from those. Errors that are large in some directions and nil in others are the signature.</div>
+    <div class="kv"><span class="dim">Quality of this fix</span><span id="xcQual" class="pill">—</span></div>
+    <div class="row" style="margin-top:8px">
+      <button id="btnSite" class="pri grow">Save as site correction</button>
+      <button id="btnSiteClr">Clear</button>
+    </div>
+    <div class="tiny dim" style="margin-top:6px" id="xcNote">Take the fix facing a direction where the
+      app shows <b>high amplification</b> — that is where the sky determines your heading most sharply.
+      Facing a low-amplification direction, the inversion is vague and the fix will be poor.</div>
+  </div>
+
+  <div class="card">
+    <h1>Site correction</h1>
+    <div class="note">A magnetometer cannot diagnose its own site. Field <b>magnitude</b> and <b>dip</b>
+      give two numbers; the anomaly has three components, and the one that rotates your heading is
+      invisible to both. That is an information limit, not a missing feature — spinning the phone does
+      not help either, because at a fixed spot the disturbed field is one fixed vector.
+      <br><br>An <b>independent heading reference</b> breaks the deadlock, and you are carrying one:
+      the filter. Building steel disturbs the field at a spot, so the heading error there is a constant
+      — take one optical fix and every other direction from that spot is corrected too.</div>
+    <div class="kv"><span class="dim">Stored correction</span><b id="siteVal" class="mono">none</b></div>
+    <div class="kv"><span class="dim">Status here</span><span id="sitePill" class="pill">—</span></div>
+    <div class="tiny dim" style="margin-top:6px" id="siteNote">Applies within 60 m of where it was
+      taken, and only when Aim source is the phone compass. Walk further and it switches itself off —
+      rooftop anomalies change over a few metres.</div>
   </div>
 
   <div class="card">
@@ -647,7 +669,7 @@ const norm=a=>{const L=len(a);return L<1e-12?[0,0,0]:scl(a,1/L);};
 const S={
   psiT:null, off:0, hand:1, handDone:false,
   hdPsi1:null, hdPsi2:null, hdDial:0, hdTurn:1, handVerdict:null,
-  northRef:"mag", walkDone:false, walkDiff:null,
+  northRef:"mag", walkDone:false, walkDiff:null, siteFix:null,
   lat:null, lon:null, acc:null,
   az:null, el:null, roll:null, absOK:false, aimSpread:0,
   frozen:false, frame:"level",
@@ -658,7 +680,7 @@ function save(){
   localStorage.setItem("pf", JSON.stringify({
     psiT:S.psiT, off:S.off, hand:S.hand, handDone:S.handDone,
     hdPsi1:S.hdPsi1, hdPsi2:S.hdPsi2, hdTurn:S.hdTurn,
-    northRef:S.northRef, walkDone:S.walkDone, walkDiff:S.walkDiff,
+    northRef:S.northRef, walkDone:S.walkDone, walkDiff:S.walkDiff, siteFix:S.siteFix,
     lat:S.lat, lon:S.lon, frame:S.frame
   }));
 }
@@ -783,6 +805,41 @@ function axisAngle(s,camAz,camEl){
           theta:mod(Math.atan2(dot(t,r),dot(t,u))*R2D,180)};
 }
 
+/* ═══════════ the sky as a compass ═══════════
+   Given the sun's position (known exactly) and the elevation (from the accelerometer,
+   which magnetism cannot touch), the polarisation angle you can SEE through the filter
+   determines the azimuth you are facing. Inverting it turns the filter into an
+   independent heading reference — which is the only thing that can rescue a site the
+   magnetometer is lying about. Viking sunstones worked on the same principle. */
+function headingFromAxis(s,camEl,thetaObs,guessAz){
+  let best=null;
+  for(let az=guessAz-80; az<=guessAz+80; az+=0.5){
+    const th=axisAngle(s,mod(az,360),camEl).theta;
+    let d=Math.abs(mod(th-thetaObs,180)); d=Math.min(d,180-d);
+    if(!best||d<best.d) best={d,az:mod(az,360)};
+  }
+  for(let az=best.az-1; az<=best.az+1; az+=0.02){   // refine
+    const th=axisAngle(s,mod(az,360),camEl).theta;
+    let d=Math.abs(mod(th-thetaObs,180)); d=Math.min(d,180-d);
+    if(d<best.d) best={d,az:mod(az,360)};
+  }
+  return best;
+}
+function metresBetween(a,b){
+  const R=6371000, D2=Math.PI/180;
+  const dp=(b.lat-a.lat)*D2, dl=(b.lon-a.lon)*D2;
+  const h=Math.sin(dp/2)**2+Math.cos(a.lat*D2)*Math.cos(b.lat*D2)*Math.sin(dl/2)**2;
+  return 2*R*Math.asin(Math.sqrt(h));
+}
+/* the stored correction applies only near where it was taken */
+function siteOffset(){
+  const f=S.siteFix;
+  if(!f||S.lat===null) return {off:0,active:false,fix:f,dist:null};
+  const dist=metresBetween({lat:S.lat,lon:S.lon},{lat:f.lat,lon:f.lon});
+  return {off: dist<=SITE_RADIUS? f.off : 0, active: dist<=SITE_RADIUS, fix:f, dist};
+}
+const SITE_RADIUS=60;   // metres
+
 /* ═══════════ magnetic environment ═══════════
    |B| and dip are independent of which way the phone is pointing, so they can be
    compared against the World Magnetic Model without trusting the heading. A clean
@@ -846,7 +903,8 @@ function solve(){
   // magnetic -> true north, from the World Magnetic Model, plus any manual trim
   const wf = declinationNow();
   const dec = (S.northRef==="mag" && wf) ? wf.dec : 0;
-  camAz = mod(camAz + dec + S.off, 360);
+  const site = (S.aimSrc==="sensor") ? siteOffset() : {off:0,active:false};
+  camAz = mod(camAz + dec + S.off + site.off, 360);
 
   const sp=sunPosition(now,lat,lon);
   const s=dir(sp.az,sp.alt);
@@ -869,7 +927,7 @@ function solve(){
   let psiTop=null;
   if(S.psiT!==null) psiTop=mod(S.psiT + S.hand*theta, 180);
 
-  return {sp,camAz,camEl,gamma,theta,P,ratio,psiTop,weak,amp,sunUp:sp.alt>-0.9};
+  return {sp,camAz,camEl,gamma,theta,P,ratio,psiTop,weak,amp,site,sunUp:sp.alt>-0.9};
 }
 
 /* ═══════════ render ═══════════ */
@@ -1344,27 +1402,60 @@ $("btnWalkClr").onclick=()=>{
 };
 $("selNorth").onchange=e=>{S.northRef=e.target.value;save();status();};
 
-/* optical cross-check: infer the heading error from what the eye actually saw */
+/* optical cross-check + site correction: use the sky as an independent compass */
+let xcResult=null;
 $("btnXc").onclick=()=>{
   const R=lastSolve;
   if(!R||R.psiTop===null||R.psiTop===undefined){alert("Get a reading on the Aim tab first.");return;}
   const obs=parseFloat($("xcObs").value);
   if(isNaN(obs)){alert("Enter the ring position you found darkest.");return;}
   let dRing=Math.abs(mod(obs-R.psiTop,180)); dRing=Math.min(dRing,180-dRing);
-  const dHead=R.amp>0.05? dRing/R.amp : NaN;
   const keep=100*Math.cos(clamp(dRing,0,90)*D)**2;
+
+  // invert the observed polarisation angle to a true heading
+  const s=dir(R.sp.az,R.sp.alt);
+  const thetaObs=mod((mod(obs,180)-S.psiT)*S.hand,180);
+  const inv=headingFromAxis(s,R.camEl,thetaObs,R.camAz);
+  const dHead=mod(inv.az-R.camAz+180,360)-180;
+
   $("xcApp").textContent=R.psiTop.toFixed(1)+"°  ("+describe(R.psiTop).main+")";
   $("xcRing").textContent=dRing.toFixed(1)+"°";
-  $("xcHead").textContent=isNaN(dHead)?"—":dHead.toFixed(0)+"°  (amplification "+R.amp.toFixed(2)+"×)";
+  $("xcTrue").textContent=inv.az.toFixed(1)+"°   (app said "+R.camAz.toFixed(1)+"°)";
+  $("xcHead").textContent=(dHead>=0?"+":"")+dHead.toFixed(1)+"°";
   $("xcKeep").textContent=keep.toFixed(0)+"% of maximum";
+
+  // how sharply does the sky pin down the heading here?
+  const q=$("xcQual");
+  const headPerRing = R.amp>0.02? 1/R.amp : 999;
+  let qual;
+  if(R.amp>=0.5){ qual="ok";  q.textContent="sharp · ±"+(2*headPerRing).toFixed(0)+"°"; }
+  else if(R.amp>=0.2){ qual="warn"; q.textContent="soft · ±"+(2*headPerRing).toFixed(0)+"°"; }
+  else { qual="bad"; q.textContent="too vague to use"; }
+  q.className="pill "+qual;
+  xcResult = qual==="bad"? null : {off:dHead, lat:S.lat, lon:S.lon, amp:R.amp};
+
   const m=magnetics();
   $("xcNote").textContent =
-    dRing<8 ? "Agreement within "+dRing.toFixed(0)+"° — about as good as this instrument gets. Nothing wrong here."
-    : "A "+dRing.toFixed(0)+"° ring disagreement implies about "+dHead.toFixed(0)+"° of heading error"+
-      (m&&m.known? ", against "+m.headErr.toFixed(0)+"° estimated from the field measurement." : ".")+
-      " You still captured "+keep.toFixed(0)+"% of the available darkening. Repeat facing other "+
-      "directions: if the error swings from near zero to large and back, it is local ironwork, not the app.";
+    qual==="bad"
+      ? "At this aim the ring barely responds to heading (amplification "+R.amp.toFixed(2)+"×), so the "+
+        "sky cannot pin down which way you are facing. Turn to a direction where the app shows higher "+
+        "amplification and try again."
+    : dRing<8
+      ? "Agreement within "+dRing.toFixed(0)+"° — about as good as this instrument gets. No correction needed."
+      : "Implies the compass is off by "+dHead.toFixed(0)+"° here"+
+        (m&&m.known? ", against "+m.headErr.toFixed(0)+"° estimated from the field measurement" : "")+
+        ". You still captured "+keep.toFixed(0)+"% of the available darkening. Save it as a site "+
+        "correction and every other direction from this spot is corrected too.";
 };
+$("btnSite").onclick=()=>{
+  if(!xcResult){alert("Run a usable cross-check first — the fix must be taken facing a high-amplification direction.");return;}
+  if(S.lat===null){alert("Need a GPS fix to anchor the correction to this spot.");return;}
+  S.siteFix={off:+xcResult.off.toFixed(2), lat:S.lat, lon:S.lon, t:Date.now(), amp:+xcResult.amp.toFixed(2)};
+  save(); status(); render();
+  alert("Site correction saved: "+(xcResult.off>=0?"+":"")+xcResult.off.toFixed(1)+
+        "°. It applies automatically within 60 m of here.");
+};
+$("btnSiteClr").onclick=()=>{ S.siteFix=null; save(); status(); render(); };
 
 /* camera interference check */
 let ifA=null, ifB=null;
@@ -1418,6 +1509,13 @@ function status(){
          : "Not applied — you have set the north reference to true north.");
   }
   handPaint();
+  const so=siteOffset(), sp2=$("sitePill");
+  $("siteVal").textContent = S.siteFix? ((S.siteFix.off>=0?"+":"")+S.siteFix.off.toFixed(1)+
+      "°  (taken at amplification "+(S.siteFix.amp||0).toFixed(2)+"×)") : "none";
+  if(!S.siteFix){ sp2.textContent="not set"; sp2.className="pill"; }
+  else if(S.lat===null){ sp2.textContent="no GPS"; sp2.className="pill warn"; }
+  else if(so.active){ sp2.textContent="active · "+so.dist.toFixed(0)+" m away"; sp2.className="pill ok"; }
+  else { sp2.textContent="off · "+(so.dist>9999?">10 km":so.dist.toFixed(0)+" m away"); sp2.className="pill warn"; }
   $("inOff").value=S.off; $("selNorth").value=S.northRef;
   if(S.lat!==null){$("inLat").value=S.lat.toFixed(5);$("inLon").value=S.lon.toFixed(5);}
 }

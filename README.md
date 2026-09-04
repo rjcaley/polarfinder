@@ -255,17 +255,48 @@ affects the photograph.
 > √((a∥² + a_dip²)/2), which is what the app uses. It is an estimate, labelled as one, and it will not
 > be exact — expect it to agree with reality to within a factor of about 1.5.
 
-### Optical cross-check — your eye as the reference instrument
+### Why the magnetometer cannot simply correct itself
 
-The filter is a better polarimeter than the phone is a compass. When the app disagrees with what you
-can plainly see, the Calibrate tab lets you enter the position you actually found darkest, and works
-backwards to the heading error that would explain it.
+A natural question: if the app can measure the disturbance, why not just subtract it?
 
-That converts a vague "it seemed off" into a number, and it distinguishes the two possibilities
-cleanly. Repeat it facing several directions:
+Because it cannot measure the part that matters. Without trusting the compass, only two quantities
+are observable — field **magnitude** and **dip**. The anomaly has **three** components, and the one
+that rotates your heading (horizontal, perpendicular to the magnetic meridian) is invisible to both.
+Two equations, three unknowns. Spinning the phone does not help either: at a fixed spot the disturbed
+field is a single fixed vector, so rotating reveals nothing new about it.
 
-- **Error near zero in two directions, large 90° away** → local ironwork. The app is fine; the site is not.
-- **The same error in every direction** → a calibration problem. Redo Step 1, or check handedness.
+That is an information limit, not a missing feature. Magnitude and dip can tell you a site is bad.
+They cannot tell you which way it is lying.
+
+### Site correction — using the sky as an independent compass
+
+What breaks the deadlock is a heading reference that does not involve magnetism, and you are carrying
+one: the filter.
+
+The sun's position is known exactly. Elevation comes from the accelerometer, which magnetism cannot
+touch. Given both, the polarization angle you can *see* through the filter determines the azimuth you
+are facing — the inverse of what the app normally computes. Viking sunstones and modern polarimetric
+navigation work on this principle.
+
+So: find the darkest position by eye, enter it, and the app solves backwards for your true heading and
+compares it with what the compass claimed.
+
+**And one fix corrects every direction from that spot.** Building steel disturbs the field at a
+location, so the resulting heading error there is a constant. It does not look constant — the *ring*
+error varies hugely with direction, because the amplification does (it ranges from about 0.05× to 3×
+across headings for a given sun). That is why one direction can look perfect while another is 21° out,
+from a single unchanging cause.
+
+Verified end to end: with a −28.5° site error simulated, ring errors of 25°, 19°, 13°, 4° and 11°
+across five headings all dropped to **0.00°** after a single fix taken in one direction.
+
+**Take the fix facing a high-amplification direction.** The app shows the figure live, and rates the
+fix *sharp*, *soft*, or *too vague to use* — it refuses to store one below 0.2×, where the sky simply
+cannot pin down your heading.
+
+The correction is anchored to where it was taken and applies within **60 m**, then switches itself
+off — rooftop anomalies change over a few metres. It only applies when Aim source is the phone
+compass.
 
 ### What to do about a bad site
 
