@@ -96,6 +96,13 @@ hr{border:0;border-top:1px solid var(--line);margin:12px 0}
       <div class="grow tiny dim">Reading</div>
       <span id="steadyPill" class="pill">—</span>
     </div>
+    <div id="facingBox" style="background:#0e1216;border:1px solid var(--line);border-radius:11px;
+         padding:10px;margin-bottom:10px">
+      <div class="tiny dim">The app thinks you are facing</div>
+      <div id="facing" style="font-size:26px;font-weight:700;letter-spacing:-.01em">—</div>
+      <div class="tiny" id="facingWarn" style="color:var(--warn);margin-top:4px">
+        If that is not the direction you are actually pointing, stop — everything below is wrong.</div>
+    </div>
     <div class="big" id="instr">Waiting for position…</div>
     <div class="tiny dim" id="instr2" style="margin-top:6px"></div>
     <div class="tiny dim" id="instr3" style="margin-top:4px"></div>
@@ -119,7 +126,7 @@ hr{border:0;border-top:1px solid var(--line);margin:12px 0}
     <div class="kv"><span class="dim">Aim error amplification</span><b id="kAmp" class="mono">—</b></div>
     <div class="tiny dim" id="dopNote" style="margin-top:6px"></div>
     <hr>
-    <div class="row"><div class="grow" style="font-weight:600">Magnetic environment</div><span id="magPill" class="pill">—</span></div>
+    <div class="row"><div class="grow" style="font-weight:600">Iron carried with the phone</div><span id="magPill" class="pill">—</span></div>
     <div class="tiny dim" id="magNote" style="margin-top:6px"></div>
   </div>
 
@@ -147,8 +154,9 @@ hr{border:0;border-top:1px solid var(--line);margin:12px 0}
       </div>
     </div>
     <div id="manualBox" class="grid2 hide" style="margin-top:8px">
-      <div><label>Camera azimuth °</label><input id="inAz" type="number" value="0" step="1"></div>
-      <div><label>Camera elevation °</label><input id="inEl" type="number" value="0" step="1"></div>
+      <div><label>True bearing °</label><input id="inAz" type="number" value="0" step="1"></div>
+      <div><label>Elevation °</label><input id="inEl" type="number" value="0" step="1"></div>
+      <div class="tiny dim" style="grid-column:1/-1">Typed bearings are used exactly as entered — true north, no declination or trim applied.</div>
     </div>
   </div>
 </div>
@@ -187,7 +195,7 @@ hr{border:0;border-top:1px solid var(--line);margin:12px 0}
     <div style="margin:10px 0">
       <svg id="calRing" viewBox="-320 -320 640 640"></svg>
     </div>
-    <label>Drag the dial, or type the ring angle directly (° clockwise from the "4" side of 46)</label>
+    <label>Drag the dial, or type the ring angle (° clockwise from 12 o’clock — “46” sits at 345–353°)</label>
     <div class="row">
       <input id="inPsiT" type="number" step="0.5" value="0" class="grow">
       <button id="btnSavePsi" class="pri">Save</button>
@@ -197,8 +205,10 @@ hr{border:0;border-top:1px solid var(--line);margin:12px 0}
 
   <div class="card">
     <h1>Step 2 · Handedness (indoors, no sun, any hour)</h1>
-    <div class="note">Every LCD and OLED emits linearly polarised light, and the polariser is bonded to
-      the panel — so the polarisation <b>turns with the device</b>. Turn the screen and the correct
+    <div class="note">Nearly every LCD and OLED emits linearly polarised light through a bonded
+      polariser, so the polarisation <b>turns with the device</b>. A few screens add a retarder film on
+      top so they do not black out through polarised sunglasses; on those there is no clear minimum and
+      an LCD laptop screen is the reliable fallback. Turn the screen and the correct
       filter position must turn with it: the same way round if the handedness is as assumed, the
       opposite way if it is mirrored.
       <br><br>You take <b>two readings</b>. The app compares them. It does not matter what the screen's
@@ -255,7 +265,7 @@ hr{border:0;border-top:1px solid var(--line);margin:12px 0}
   </div>
 
   <div class="card">
-    <h1>Optional · North reference check (one time, ever)</h1>
+    <h1>Compass truth check (GPS) — the only absolute test</h1>
     <div class="note">Chrome on Android reports headings from Android's rotation-vector sensor, which is
       referenced to <b>magnetic</b> north — so the app applies the declination above. Some Android
       layers hand back true north already, in which case it should not. This is a property of your
@@ -276,6 +286,9 @@ hr{border:0;border-top:1px solid var(--line);margin:12px 0}
     <div class="row" style="margin-top:8px">
       <button id="btnWalk" class="pri grow">Start walk</button>
       <button id="btnWalkClr">Clear</button>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button id="btnWalkApply" class="hot grow hide">Apply measured offset</button>
     </div>
     <div class="tiny dim" style="margin-top:6px" id="wkNote">Until you run this, the app assumes magnetic
       north, which is almost certainly right for Chrome on Android.</div>
@@ -414,8 +427,9 @@ hr{border:0;border-top:1px solid var(--line);margin:12px 0}
       <p><b>GPS + clock</b> give the sun's azimuth and altitude from a standard solar position algorithm. Location
       only needs to be right to a few kilometres; time needs to be right to about a minute.</p>
       <p><b>Compass + tilt</b> give where the lens is pointed. This is the weak link: Android's rotation vector is
-      referenced to magnetic north, it drifts near metal, and the app has no way to read your declination — which
-      is why the shadow sight in Step 2 exists.</p>
+      referenced to magnetic north and it drifts near metal. Declination is handled automatically by the
+      embedded World Magnetic Model. What no model can fix is a compass that is wrong by a constant
+      amount — a stale magnetometer calibration or building steel — which is what the GPS walk check is for.</p>
       <p><b>Roll</b> is the other input, and the app assumes a level horizon unless you tell it otherwise, since
       that is how an M gets held most of the time.</p>
     </div>
@@ -463,15 +477,37 @@ hr{border:0;border-top:1px solid var(--line);margin:12px 0}
       <button id="btnDbgShare" class="grow sm">Share…</button>
       <button id="btnDbgClear" class="sm">Clear log</button>
     </div>
+    <div class="tiny" style="margin-top:8px;color:var(--warn)">The file includes your GPS position to
+      about a metre and your device/browser identity. Nothing leaves the phone unless you send it.</div>
     <div class="tiny dim" style="margin-top:8px" id="dbgMsg">The file lands in your Downloads folder —
       attach it to the conversation. Copy puts a shorter summary on the clipboard if you would rather
       paste it.</div>
   </div>
 
   <div class="card">
+    <h1>Field accuracy — the test that actually matters</h1>
+    <div class="note">Every other check in this app compares the app against its own model. This one
+      compares it against the sky. Take 20–30 readings across different headings and sun angles,
+      attaching the true darkest position each time, and the spread below <b>is</b> the app's accuracy.
+      Under about ±8° and it works; wider, and the shape of the distribution says why.</div>
+    <div class="kv"><span class="dim">Readings with a truth value</span><b id="accN" class="mono">0</b></div>
+    <div class="kv"><span class="dim">Median error</span><b id="accMed" class="mono">—</b></div>
+    <div class="kv"><span class="dim">Spread (10th–90th)</span><b id="accSpread" class="mono">—</b></div>
+    <div class="kv"><span class="dim">Median darkness kept</span><b id="accKeep" class="mono">—</b></div>
+    <div class="kv"><span class="dim">Pattern</span><span id="accPat" class="pill">—</span></div>
+    <div class="tiny mono" id="accHist" style="margin-top:8px;white-space:pre;line-height:1.35"></div>
+    <div class="tiny dim" id="accNote" style="margin-top:6px"></div>
+  </div>
+
+  <div class="card">
     <h1>Reading log</h1>
-    <div class="tiny dim">The last 20 held readings are kept, so a session's worth of tests can be sent
-      in one file even if you forget to export each time.</div>
+    <div class="tiny dim">The last 20 held readings are kept. Pick one and attach the ring position that
+      was truly darkest, so a session builds the histogram above.</div>
+    <div class="row" style="margin-top:8px">
+      <select id="dbgPick" class="grow"></select>
+      <input id="dbgPickObs" type="number" step="0.5" placeholder="true °" style="max-width:104px">
+      <button id="btnDbgAttach" class="pri sm">Attach</button>
+    </div>
     <div id="dbgLog" class="tiny mono" style="margin-top:8px;white-space:pre-wrap;line-height:1.5"></div>
   </div>
 
@@ -487,7 +523,7 @@ hr{border:0;border-top:1px solid var(--line);margin:12px 0}
 
 <script>
 "use strict";
-const APP_VERSION="v12";
+const APP_VERSION="v14";
 const D=Math.PI/180, R2D=180/Math.PI;
 const $=id=>document.getElementById(id);
 const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
@@ -553,6 +589,7 @@ const WMM_C=[
 
 /* World Magnetic Model 2025 — declination.
    Direct port of the NOAA legacy reference algorithm. Returns degrees east of true north. */
+const WMM_VALID_TO = 2029;   // WMM2025 coefficients expire 31 Dec 2029
 const WMM_N = 12;
 let _wmmReady = false, _c = [], _cd = [], _snorm = [], _k = [], _fn = [], _fm = [];
 function wmmInit(){
@@ -718,7 +755,7 @@ const norm=a=>{const L=len(a);return L<1e-12?[0,0,0]:scl(a,1/L);};
 const S={
   psiT:null, off:0, hand:1, handDone:false,
   hdPsi1:null, hdPsi2:null, hdDial:0, hdTurn:1, handVerdict:null,
-  northRef:"mag", walkDone:false, walkDiff:null, siteFix:null,
+  northRef:"mag", walkDone:false, walkDiff:null, siteFix:null, walkOffset:null,
   lat:null, lon:null, acc:null,
   az:null, el:null, roll:null, absOK:false, aimSpread:0, geoLive:false,
   frozen:false, frame:"level",
@@ -727,21 +764,27 @@ const S={
 };
 function save(){
   localStorage.setItem("pf", JSON.stringify({
+    schema:2,
     psiT:S.psiT, off:S.off, hand:S.hand, handDone:S.handDone,
     hdPsi1:S.hdPsi1, hdPsi2:S.hdPsi2, hdTurn:S.hdTurn,
     northRef:S.northRef, walkDone:S.walkDone, walkDiff:S.walkDiff, siteFix:S.siteFix,
+    walkOffset:S.walkOffset,
     frame:S.frame
   }));
 }
 /* declination here and now, from the embedded WMM2025 */
 function declinationNow(){
-  if(S.lat===null||S.lon===null) return null;
+  if(typeof S.lat!=="number"||typeof S.lon!=="number"||!isFinite(S.lat)||!isFinite(S.lon)) return null;
   try{ return wmmField(S.lat,S.lon,0,decimalYear(new Date())); }catch(e){ return null; }
 }
+const PERSIST=["psiT","off","hand","handDone","hdPsi1","hdPsi2","hdTurn",
+  "northRef","walkDone","walkDiff","siteFix","walkOffset","frame"];
 function load(){
   try{
     const o=JSON.parse(localStorage.getItem("pf")||"{}");
-    Object.assign(S,o);
+    /* Whitelist. An earlier build persisted lat/lon; blindly assigning whatever
+       is in storage would resurrect a stale position from a previous session. */
+    for(const k of PERSIST) if(k in o) S[k]=o[k];
   }catch(e){}
 }
 load();
@@ -970,17 +1013,24 @@ function magnetics(){
 }
 function solve(){
   const now=new Date();
-  const lat=S.lat, lon=S.lon;
+  const lat=(typeof S.lat==="number"&&isFinite(S.lat))?S.lat:null;
+  const lon=(typeof S.lon==="number"&&isFinite(S.lon))?S.lon:null;
+  if(lat===null||lon===null) return null;
   let camAz, camEl;
   if(S.aimSrc==="manual"){ camAz=S.manAz; camEl=S.manEl; }
   else { camAz=S.az; camEl=S.el; }
   if(camAz===null||camAz===undefined||lat===null) return null;
 
   // magnetic -> true north, from the World Magnetic Model, plus any manual trim
+  /* A typed bearing is already a TRUE bearing — it never went through the
+     magnetometer, so declination, the manual trim and any site correction must
+     not be applied to it. Doing so silently corrupted the very fallback the
+     documentation recommends when the compass is untrustworthy. */
   const wf = declinationNow();
-  const dec = (S.northRef==="mag" && wf) ? wf.dec : 0;
-  const site = (S.aimSrc==="sensor") ? siteOffset() : {off:0,active:false};
-  camAz = mod(camAz + dec + S.off + site.off, 360);
+  const manual = (S.aimSrc!=="sensor");
+  const dec = (!manual && S.northRef==="mag" && wf) ? wf.dec : 0;
+  const site = manual ? {off:0,active:false} : siteOffset();
+  camAz = mod(camAz + dec + (manual?0:S.off) + site.off, 360);
 
   const sp=sunPosition(now,lat,lon);
   const s=dir(sp.az,sp.alt);
@@ -1029,7 +1079,8 @@ function paint(R){
     $("instr3").textContent="Move the phone, or tap Enable sensors to restart it.";
     $("steadyPill").textContent="stale"; $("steadyPill").className="pill bad";
     $("steadyNote").textContent="Readings are not live. Nothing below can be trusted until this clears.";
-    drawRing($("ring"), S.ringShown);
+    drawRing($("ring"), S.ringShown); $("ring").setAttribute("opacity","0.25");
+    $("facing").textContent="—";
     return;
   }
   $("ifLive").textContent = S.az===null? "—" : S.az.toFixed(1)+"°";
@@ -1042,9 +1093,12 @@ function paint(R){
     $("instr2").textContent = S.lat===null? "Tap Use GPS in Calibrate, or type a location."
                                           : "Tap Enable sensors.";
     $("instr3").textContent="";
-    drawRing($("ring"), S.ringShown);
+    drawRing($("ring"), S.ringShown); $("ring").setAttribute("opacity","0.25");
     return;
   }
+  const CARD=["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"];
+  $("facing").textContent=CARD[Math.round(mod(R.camAz,360)/22.5)%16]+"  "+R.camAz.toFixed(0)+"°"+
+    (R.camEl>8?"  ↑":R.camEl<-8?"  ↓":"");
   $("kSun").textContent=R.sp.az.toFixed(1)+"° / "+R.sp.alt.toFixed(1)+"°";
   $("kCam").textContent=R.camAz.toFixed(1)+"° / "+R.camEl.toFixed(1)+"°";
   $("kGamma").textContent=R.gamma.toFixed(1)+"°";
@@ -1066,12 +1120,15 @@ function paint(R){
   else note="Weak. Expect a subtle effect.";
   $("dopNote").textContent=note;
 
-  if(S.psiT===null){
+  /* R may be a HELD snapshot taken before the filter was calibrated, in which
+     case R.psiTop is null even though S.psiT is now set. Test the snapshot, not
+     just the current state. */
+  if(S.psiT===null || R.psiTop===null || R.psiTop===undefined){
     $("instr").textContent="Filter not calibrated yet";
     $("instr2").textContent="Do Step 1 on the Calibrate tab — five minutes, no sun needed.";
     $("instr3").textContent="Meanwhile: the axis should sit at "+R.theta.toFixed(0)+
       "° clockwise from vertical in your frame.";
-    drawRing($("ring"), S.ringShown);
+    drawRing($("ring"), S.ringShown); $("ring").setAttribute("opacity","0.25");
     return;
   }
   if(R.weak){
@@ -1084,7 +1141,14 @@ function paint(R){
     const p1=R.psiTop, p2=mod(R.psiTop+180,360);
     const near=p=>{let m=999;for(const G of GLYPHS)
       m=Math.min(m,Math.abs(mod(G.psi-p+180,360)-180));return m;};
-    const pick = near(p2)<near(p1)-1 ? p2 : p1;
+    /* Stick to whichever twin was shown last. Without this, sub-degree hand
+       jitter flips the whole graphic to the opposite side of the ring — which
+       happened in the field, showing one setting as both "K of KSM" and
+       "B of B+W" a minute apart. */
+    const prev=(typeof S.ringShown==="number")?S.ringShown:null;
+    const dPrev=p=>{const x=Math.abs(mod(p-prev,360));return Math.min(x,360-x);};
+    const pick = prev===null ? (near(p2)<near(p1)-1 ? p2 : p1)
+                             : (dPrev(p1)<=dPrev(p2) ? p1 : p2);
     const d1=describe(pick), d2=describe(mod(pick+180,360));
     $("instr").textContent=d1.main;
     $("instr2").textContent=d1.sub+"   ·   ring angle "+pick.toFixed(1)+"°";
@@ -1092,7 +1156,7 @@ function paint(R){
     R.psiTop=pick;
   }
   S.ringShown=R.psiTop;
-  drawRing($("ring"), R.psiTop);
+  drawRing($("ring"), R.psiTop); $("ring").setAttribute("opacity","1");
   steadiness(R);
   magPaint(R);
 }
@@ -1138,204 +1202,261 @@ function steadiness(R){
 function magPaint(R){
   const pill=$("magPill"), note=$("magNote"), m=magnetics();
 
-  // headline builder shared by both measurement paths
-  const verdict=(headErr,detail)=>{
-    const ringErr=headErr*R.amp, loss=lossPct(ringErr);
-    let word,level,advice;
-    if(loss<3){ word="Site is fine"; level="ok"; advice="Use the app normally."; }
-    else if(loss<10){ word="Slight loss"; level="ok"; advice="Fine to use — the error is smaller than your ability to see it."; }
-    else if(loss<25){ word="Noticeable loss"; level="warn";
-      advice="Usable, but take a site correction on the Calibrate tab, or set the filter by eye."; }
-    else { word="DO NOT USE HERE"; level="bad";
-      advice="The compass is too disturbed at this spot. Set the filter by eye, take a site correction, "+
-             "or move several metres and re-test."; }
-    pill.textContent=word+" · −"+loss.toFixed(0)+"%";
-    pill.className="pill "+level;
-    note.innerHTML="<b style='font-size:15px'>Up to −"+loss.toFixed(0)+"% of maximum darkness</b><br>"+
-      "Compass off by up to <b>±"+headErr.toFixed(0)+"°</b> here → <b>±"+ringErr.toFixed(0)+
-      "°</b> on the ring (×"+R.amp.toFixed(2)+" at this aim) → you keep <b>"+
-      (100-loss).toFixed(0)+"%</b> of the darkening a perfect setting would give.<br>"+
-      "<b>"+advice+"</b><br><span class='dim'>"+detail+"</span>";
-  };
+  /* Worded narrowly on purpose. Iron that travels WITH the phone rotates against
+     Earth's field as you turn, giving a heading error that varies sinusoidally
+     with heading; the gyro-vs-compass sweep fits exactly that and measures it
+     well. Iron fixed in the WORLD, and a stale magnetometer calibration, do
+     something different: they shift every heading by the SAME amount, which the
+     fit absorbs into its offset term and cannot see. A real rooftop measured
+     0.43° on this test while the compass was 159° wrong. So this must never be
+     allowed to read as "the site is fine". */
+  const caveat="<br><span class='dim'>This only sees iron that moves with the phone. A "+
+    "wrong-but-constant heading — building steel, or a stale magnetometer calibration — is "+
+    "invisible here. <b>Check the Facing readout above against a direction you actually know.</b></span>";
 
-  if(m && m.known){                                  // raw magnetometer (needs a Chrome flag)
-    verdict(m.headErr, "From the field itself: "+m.F.toFixed(1)+" µT vs model "+m.F0.toFixed(1)+
-      ", dip "+m.dip.toFixed(1)+"° vs "+m.I0.toFixed(1)+"°.");
+  if(m && m.known){
+    const ringErr=m.headErr*R.amp, loss=lossPct(ringErr);
+    pill.textContent="field "+(loss<10?"normal":"disturbed")+" · −"+loss.toFixed(0)+"%";
+    pill.className="pill "+(loss<3?"ok":loss<10?"warn":"bad");
+    note.innerHTML="Measured field <b>"+m.F.toFixed(1)+" µT</b> vs model <b>"+m.F0.toFixed(1)+
+      "</b>, dip <b>"+m.dip.toFixed(1)+"°</b> vs <b>"+m.I0.toFixed(1)+"°</b> → estimated <b>±"+
+      m.headErr.toFixed(0)+"°</b> of heading error, about <b>−"+loss.toFixed(0)+
+      "%</b> of maximum darkness."+caveat;
     return;
   }
-
   const f=fieldConsistency();
   if(!f.ready){
     pill.textContent="measuring…"; pill.className="pill";
-    note.textContent="Comparing the compass against the gyroscope, which iron cannot affect. "+
-      "Sweep the phone slowly through half a circle.";
+    note.innerHTML="Comparing the compass against the gyroscope. Sweep the phone through about a "+
+      "third of a circle."+caveat;
     return;
   }
   const NEED=120;
   if(f.coverage<NEED){
     pill.textContent="sweep "+Math.max(0,Math.round(NEED-f.coverage))+"° more";
     pill.className="pill warn";
-    note.innerHTML="<b>Turn slowly through about a third of a circle.</b><br>Covered <b>"+
-      f.coverage.toFixed(0)+"°</b> of the "+NEED+"° needed ("+Math.round(100*f.coverage/NEED)+
-      "%). Below that the measurement is not reliable enough to quote — a 30° sweep can be wrong "+
-      "by over 100°.";
+    note.innerHTML="<b>Turn slowly through about a third of a circle.</b> Covered <b>"+
+      f.coverage.toFixed(0)+"°</b> of "+NEED+"°. Below that a reading can be out by over 100°."+caveat;
     return;
   }
-  const conf = f.se<Infinity && f.se<0.5*Math.max(f.A,1)? "±"+f.se.toFixed(0)+"°" : "uncertain";
-  verdict(f.A,
-    "Measured by sweeping "+f.coverage.toFixed(0)+"°: the compass disagrees with the gyroscope by "+
-    "an amplitude of "+f.A.toFixed(1)+"° ("+conf+"), residual noise "+f.rms.toFixed(1)+"°. "+
-    "A distortion that is identical in every direction cannot be seen this way — the optical site "+
-    "correction covers that case.");
+  const ringErr=f.A*R.amp, loss=lossPct(ringErr);
+  let word,level,advice;
+  if(loss<3){ word="none detected"; level="ok";
+    advice="No iron is moving with the phone. That is <b>not</b> a verdict on this location."; }
+  else if(loss<10){ word="slight"; level="ok";
+    advice="A little iron travels with the phone — smaller than you could see in a photograph."; }
+  else if(loss<25){ word="noticeable"; level="warn";
+    advice="Something magnetic is moving with the phone. Put the camera down, take the phone out of "+
+           "any magnetic case, and re-test."; }
+  else { word="severe"; level="bad";
+    advice="Something strongly magnetic is attached to or held near the phone. Separate them before "+
+           "using the app."; }
+  pill.textContent=word+(loss>=3?" · −"+loss.toFixed(0)+"%":"");
+  pill.className="pill "+level;
+  note.innerHTML="Compass vs gyroscope over a "+f.coverage.toFixed(0)+"° sweep: amplitude <b>"+
+    f.A.toFixed(1)+"°</b>"+(isFinite(f.se)?" (±"+f.se.toFixed(1)+"°)":"")+" → <b>±"+ringErr.toFixed(0)+
+    "°</b> of ring, about <b>−"+loss.toFixed(0)+"%</b> of maximum darkness. "+advice+caveat;
 }
 
 /* ═══════════ diagnostics ═══════════
-   The raw orientation events are kept verbatim. With alpha/beta/gamma, the
-   absolute flag and a timestamp, the entire calculation can be reproduced from
-   scratch off-device and compared against what the app decided — which is the
-   only way to tell a wrong answer from a wrong sensor. */
-const RAW=[];                     // last N raw orientation events
-const RAWMAX=400;
+   Raw orientation events are kept verbatim so the whole calculation can be
+   reproduced off-device and compared against what the app decided. */
+const RAW=[]; const RAWMAX=400;
 function noteRaw(e,isAbs){
   RAW.push({t:Math.round(nowMs()), a:+(+e.alpha).toFixed(3), b:+(+e.beta).toFixed(3),
             g:+(+e.gamma).toFixed(3), abs:!!isAbs,
             wk: typeof e.webkitCompassHeading==="number"? +e.webkitCompassHeading.toFixed(2):null});
   if(RAW.length>RAWMAX) RAW.splice(0,RAW.length-RAWMAX);
 }
-const DBGLOG=[];                  // held readings this session
+const DBGLOG=[];
 function buildSnapshot(tag){
   try{
     const R=lastSolve, wf=declinationNow(), so=siteOffset(), fc=fieldConsistency(), mg=magnetics();
     return {
-      schema:"polarfinder-debug/2",
-      appVersion:APP_VERSION,
-      tag:tag||"manual",
-      capturedISO:new Date().toISOString(),
-      capturedLocal:new Date().toString(),
-      device:{
-        ua:navigator.userAgent, platform:navigator.platform||null,
-        lang:navigator.language, dpr:window.devicePixelRatio,
-        screen:[screen.width,screen.height],
+      schema:"polarfinder-debug/2", appVersion:APP_VERSION, tag:tag||"manual",
+      capturedISO:new Date().toISOString(), capturedLocal:new Date().toString(),
+      device:{ ua:navigator.userAgent, platform:navigator.platform||null, lang:navigator.language,
+        dpr:window.devicePixelRatio, screen:[screen.width,screen.height],
         standalone: window.matchMedia && window.matchMedia("(display-mode: standalone)").matches,
-        secure: window.isSecureContext, tzOffsetMin:new Date().getTimezoneOffset()
-      },
-      sensors:{
-        sawAbsolute, listenersOn,
+        secure: window.isSecureContext, tzOffsetMin:new Date().getTimezoneOffset() },
+      sensors:{ sawAbsolute, listenersOn,
         orientAgeMs: isFinite(orientAge())? Math.round(orientAge()):null,
         geoAgeMs: isFinite(geoAge())? Math.round(geoAge()):null,
         geoLive:S.geoLive, aimSpreadDeg:+(S.aimSpread||0).toFixed(2),
-        magnetometer: MAG.on? {F:+MAG.F.toFixed(2), dip:+MAG.dip.toFixed(2), n:MAG.n} : {available:false, err:MAG.err}
-      },
-      calibration:{
-        psiT:S.psiT, hand:S.hand, handDone:S.handDone,
-        hdPsi1:S.hdPsi1, hdPsi2:S.hdPsi2, hdTurn:S.hdTurn,
-        northRef:S.northRef, walkDone:S.walkDone, walkDiff:S.walkDiff,
-        manualTrim:S.off, siteFix:S.siteFix, frame:S.frame, aimSrc:S.aimSrc
-      },
-      position: S.lat===null? null : {lat:+S.lat.toFixed(6), lon:+S.lon.toFixed(6), accM:S.acc},
-      rawAim: {az:S.az===null?null:+S.az.toFixed(3), el:S.el===null?null:+S.el.toFixed(3),
-               rollVec:S.roll? S.roll.map(x=>+x.toFixed(5)):null,
-               manualAz:S.manAz, manualEl:S.manEl},
-      declination: wf? {dec:+wf.dec.toFixed(4), inc:+wf.inc.toFixed(3), F_nT:Math.round(wf.f), H_nT:Math.round(wf.h)} : null,
-      siteCorrection:{applied:so.off, active:so.active, distM:so.dist===null?null:Math.round(so.dist), stale:!!so.stale},
-      solved: R? {
-        sunAz:+R.sp.az.toFixed(3), sunAlt:+R.sp.alt.toFixed(3),
-        camAzUsed:+R.camAz.toFixed(3), camEl:+R.camEl.toFixed(3),
-        gamma:+R.gamma.toFixed(3), thetaImagePlane:+R.theta.toFixed(3),
-        P:+R.P.toFixed(4), brightDarkRatio:+R.ratio.toFixed(3),
+        magnetometer: MAG.on? {F:+MAG.F.toFixed(2), dip:+MAG.dip.toFixed(2), n:MAG.n}
+                            : {available:false, err:MAG.err} },
+      calibration:{ psiT:S.psiT, hand:S.hand, handDone:S.handDone, hdPsi1:S.hdPsi1, hdPsi2:S.hdPsi2,
+        hdTurn:S.hdTurn, northRef:S.northRef, walkDone:S.walkDone, walkDiff:S.walkDiff,
+        walkOffset:S.walkOffset, manualTrim:S.off, siteFix:S.siteFix, frame:S.frame, aimSrc:S.aimSrc },
+      position: (S.lat===null||S.lon===null)? null
+        : {lat:+S.lat.toFixed(6), lon:+S.lon.toFixed(6), accM:S.acc},
+      rawAim:{ az:S.az===null?null:+S.az.toFixed(3), el:S.el===null?null:+S.el.toFixed(3),
+        rollVec:S.roll? S.roll.map(x=>+x.toFixed(5)):null, manualAz:S.manAz, manualEl:S.manEl },
+      declination: wf? {dec:+wf.dec.toFixed(4), inc:+wf.inc.toFixed(3),
+                        F_nT:Math.round(wf.f), H_nT:Math.round(wf.h)} : null,
+      siteCorrection:{applied:so.off, active:so.active,
+        distM:so.dist===null?null:Math.round(so.dist), stale:!!so.stale},
+      solved: R? { sunAz:+R.sp.az.toFixed(3), sunAlt:+R.sp.alt.toFixed(3),
+        camAzUsed:+R.camAz.toFixed(3), camEl:+R.camEl.toFixed(3), gamma:+R.gamma.toFixed(3),
+        thetaImagePlane:+R.theta.toFixed(3), P:+R.P.toFixed(4), brightDarkRatio:+R.ratio.toFixed(3),
         amplification:+R.amp.toFixed(4), psiTopShown:+R.psiTop.toFixed(3),
-        instruction:$("instr").textContent, detail:$("instr2").textContent
-      } : null,
+        instruction:$("instr").textContent, detail:$("instr2").textContent } : null,
       magneticCheck: fc.ready? {coverageDeg:+fc.coverage.toFixed(1), amplitudeDeg:+fc.A.toFixed(2),
-                                seDeg:isFinite(fc.se)?+fc.se.toFixed(2):null, rmsDeg:+fc.rms.toFixed(2), n:fc.n}
-                             : {ready:false, coverageDeg:+(fc.coverage||0).toFixed(1)},
+        seDeg:isFinite(fc.se)?+fc.se.toFixed(2):null, rmsDeg:+fc.rms.toFixed(2), n:fc.n}
+        : {ready:false, coverageDeg:+(fc.coverage||0).toFixed(1)},
       magnetometerCheck: mg&&mg.known? {F:+mg.F.toFixed(2),dip:+mg.dip.toFixed(2),
-                                        headErrDeg:+mg.headErr.toFixed(2)} : null,
+        headErrDeg:+mg.headErr.toFixed(2)} : null,
       observed:{ darkestRingDeg:null, note:null },
       rawOrientationEvents: RAW.slice(-RAWMAX),
       fusionSamples: FUSE.buf.slice(-300).map(x=>({t:Math.round(x.t), d:+x.d.toFixed(3), h:+x.h.toFixed(3)}))
     };
-  }catch(err){
-    return {schema:"polarfinder-debug/2", error:String(err&&err.stack||err), capturedISO:new Date().toISOString()};
-  }
+  }catch(err){ return {schema:"polarfinder-debug/2", error:String(err&&err.stack||err),
+                       capturedISO:new Date().toISOString()}; }
+}
+function enrich(s){
+  if(!s || !s.solved || !s.observed || s.observed.darkestRingDeg===null) return s;
+  let dr=Math.abs(mod(s.observed.darkestRingDeg-s.solved.psiTopShown,180));
+  dr=Math.min(dr,180-dr);
+  s.observed.ringDisagreementDeg=+dr.toFixed(2);
+  s.observed.darkeningKeptPct=+(100*Math.cos(clamp(dr,0,90)*D)**2).toFixed(1);
+  s.observed.errorIfHandednessFlippedDeg=+(2*s.solved.thetaImagePlane).toFixed(1);
+  try{
+    const sv=dir(s.solved.sunAz,s.solved.sunAlt);
+    const thObs=mod((mod(s.observed.darkestRingDeg,180)-S.psiT)*S.hand,180);
+    const inv=headingFromAxis(sv,s.solved.camEl,thObs,s.solved.camAzUsed);
+    s.observed.impliedTrueHeadingDeg=+inv.az.toFixed(2);
+    s.observed.impliedHeadingErrDeg=+inv.offset.toFixed(2);
+    s.observed.inversionAmbiguous=!!inv.ambiguous;
+    s.observed.inversionReliable = s.solved.amplification>=0.5 && !inv.ambiguous;
+    s.observed.inversionNote = s.observed.inversionReliable
+      ? "amplification "+s.solved.amplification.toFixed(2)+"x — heading recovery well conditioned"
+      : "amplification only "+s.solved.amplification.toFixed(2)+"x — recovered heading NOT reliable; "+
+        "the ring disagreement is still valid";
+  }catch(e){ s.observed.inversionError=String(e); }
+  return s;
 }
 function currentSnapshot(){
   const s=(S.frozen && S.heldSnap) ? JSON.parse(JSON.stringify(S.heldSnap)) : buildSnapshot("live");
   const o=parseFloat($("dbgObs").value);
-  s.observed={ darkestRingDeg: isNaN(o)? null : o, note: $("dbgNote").value || null };
-  if(s.observed.darkestRingDeg!==null && s.solved && s.calibration.psiT!==null){
-    let dr=Math.abs(mod(s.observed.darkestRingDeg-s.solved.psiTopShown,180));
-    dr=Math.min(dr,180-dr);
-    s.observed.ringDisagreementDeg=+dr.toFixed(2);
-    s.observed.darkeningKeptPct=+(100*Math.cos(clamp(dr,0,90)*D)**2).toFixed(1);
-    s.observed.errorIfHandednessFlippedDeg=+(2*s.solved.thetaImagePlane).toFixed(1);
-    /* Invert the geometry properly rather than dividing by the local derivative.
-       Over a large error the derivative is not constant, and where amplification
-       is small that linearisation is badly wrong — exactly the case where the
-       heading error is biggest and most worth knowing. */
-    try{
-      const sv=dir(s.solved.sunAz,s.solved.sunAlt);
-      const thObs=mod((mod(s.observed.darkestRingDeg,180)-S.psiT)*S.hand,180);
-      const inv=headingFromAxis(sv,s.solved.camEl,thObs,s.solved.camAzUsed);
-      s.observed.impliedTrueHeadingDeg=+inv.az.toFixed(2);
-      s.observed.impliedHeadingErrDeg=+inv.offset.toFixed(2);
-      s.observed.inversionAmbiguous=!!inv.ambiguous;
-      s.observed.inversionRivalOffsetDeg=inv.rivalOffset===null?null:+inv.rivalOffset.toFixed(2);
-      s.observed.linearisedHeadingErrDeg = s.solved.amplification>0.02
-        ? +(dr/s.solved.amplification).toFixed(1) : null;   // kept for comparison
-      /* Below about 0.5x amplification the ring hardly responds to heading, so
-         many headings fit the same observation and the inversion can settle on
-         the wrong one. Say so in the file rather than let the number be trusted. */
-      s.observed.inversionReliable = s.solved.amplification>=0.5 && !inv.ambiguous;
-      s.observed.inversionNote = s.observed.inversionReliable
-        ? "amplification "+s.solved.amplification.toFixed(2)+"x — heading recovery is well conditioned"
-        : "amplification only "+s.solved.amplification.toFixed(2)+"x"+(inv.ambiguous?" and multiple roots fit":"")+
-          " — the recovered heading is NOT reliable here; the ring disagreement is still valid";
-    }catch(e){ s.observed.inversionError=String(e); }
-  }
-  return s;
+  s.observed={ darkestRingDeg: isFinite(o)? o : null, note: $("dbgNote").value || null };
+  return enrich(s);
 }
 function dbgFilename(){
-  const d2=new Date(), p=n=>String(n).padStart(2,"0");
-  return "polarfinder-"+d2.getFullYear()+p(d2.getMonth()+1)+p(d2.getDate())+"-"+p(d2.getHours())+p(d2.getMinutes())+p(d2.getSeconds())+".json";
+  const t=new Date(), p=n=>String(n).padStart(2,"0");
+  return "polarfinder-"+t.getFullYear()+p(t.getMonth()+1)+p(t.getDate())+"-"+
+         p(t.getHours())+p(t.getMinutes())+p(t.getSeconds())+".json";
 }
 function dbgPayload(){
   return JSON.stringify({schema:"polarfinder-debug/2", appVersion:APP_VERSION,
-    exportedISO:new Date().toISOString(), current:currentSnapshot(), log:DBGLOG}, null, 1);
+    exportedISO:new Date().toISOString(), current:currentSnapshot(),
+    log:DBGLOG.map(e=>enrich(JSON.parse(JSON.stringify(e))))}, null, 1);
 }
 function dbgSummary(){
   const s=currentSnapshot();
   if(s.error) return "PolarFinder debug: snapshot failed — "+s.error;
   const L=[];
   L.push("PolarFinder "+s.appVersion+"  "+s.capturedISO+"  ("+s.tag+")");
-  L.push("cal: psiT="+s.calibration.psiT+" hand="+s.calibration.hand+" handDone="+s.calibration.handDone+
-         " northRef="+s.calibration.northRef+" trim="+s.calibration.manualTrim+" frame="+s.calibration.frame+
-         " aimSrc="+s.calibration.aimSrc);
+  L.push("cal: psiT="+s.calibration.psiT+" hand="+s.calibration.hand+" northRef="+s.calibration.northRef+
+         " trim="+s.calibration.manualTrim+" frame="+s.calibration.frame+" aimSrc="+s.calibration.aimSrc);
   L.push("site: "+JSON.stringify(s.siteCorrection)+"  fix="+JSON.stringify(s.calibration.siteFix));
   L.push("pos: "+JSON.stringify(s.position)+"  geoAge="+s.sensors.geoAgeMs+"ms orientAge="+s.sensors.orientAgeMs+"ms");
-  L.push("rawAim: az="+s.rawAim.az+" el="+s.rawAim.el+" spread="+s.sensors.aimSpreadDeg+"  sawAbsolute="+s.sensors.sawAbsolute);
+  L.push("rawAim: az="+s.rawAim.az+" el="+s.rawAim.el+" spread="+s.sensors.aimSpreadDeg+
+         "  sawAbsolute="+s.sensors.sawAbsolute);
   L.push("decl: "+JSON.stringify(s.declination));
-  if(s.solved) L.push("solved: sun "+s.solved.sunAz+"/"+s.solved.sunAlt+"  cam "+s.solved.camAzUsed+"/"+s.solved.camEl+
-    "  gamma "+s.solved.gamma+"  theta "+s.solved.thetaImagePlane+"  amp "+s.solved.amplification+
-    "  P "+s.solved.P+"  ring "+s.solved.psiTopShown);
+  if(s.solved) L.push("solved: sun "+s.solved.sunAz+"/"+s.solved.sunAlt+"  cam "+s.solved.camAzUsed+"/"+
+    s.solved.camEl+"  gamma "+s.solved.gamma+"  theta "+s.solved.thetaImagePlane+"  amp "+
+    s.solved.amplification+"  P "+s.solved.P+"  ring "+s.solved.psiTopShown);
   if(s.solved) L.push("shown: "+s.solved.instruction+" | "+s.solved.detail);
-  L.push("magCheck: "+JSON.stringify(s.magneticCheck));
+  L.push("magCheck(phone-carried iron only): "+JSON.stringify(s.magneticCheck));
   L.push("observed: "+JSON.stringify(s.observed));
+  const acc=accStats();
+  if(acc) L.push("field accuracy over "+acc.n+" readings: median "+acc.med.toFixed(1)+
+    "  p10-p90 "+acc.p10.toFixed(1)+"-"+acc.p90.toFixed(1)+"  mean signed "+acc.mean.toFixed(1)+
+    "  sd "+acc.sd.toFixed(1));
   L.push("rawEvents="+s.rawOrientationEvents.length+" fusion="+s.fusionSamples.length+
          "  (download the JSON for those)");
   return L.join("\n");
 }
+
+/* ── field accuracy: the app against the sky, not against its own model ── */
+function logErr(e){
+  if(!e || !e.solved || !e.observed || e.observed.darkestRingDeg==null) return null;
+  let x=Math.abs(mod(e.observed.darkestRingDeg-e.solved.psiTopShown,180));
+  return Math.min(x,180-x);
+}
+function accStats(){
+  const rows=DBGLOG.map(e=>({e,err:logErr(e)})).filter(r=>r.err!==null);
+  if(!rows.length) return null;
+  const errs=rows.map(r=>r.err).slice().sort((a,b)=>a-b);
+  const q=p=>errs[Math.min(errs.length-1,Math.max(0,Math.round(p*(errs.length-1))))];
+  const signed=rows.map(r=>{ let s=mod(r.e.observed.darkestRingDeg-r.e.solved.psiTopShown,180);
+                             return s>90? s-180 : s; });
+  const mean=signed.reduce((a,b)=>a+b,0)/signed.length;
+  const sd=Math.sqrt(signed.reduce((a,b)=>a+(b-mean)*(b-mean),0)/Math.max(1,signed.length-1));
+  return {n:rows.length, errs, med:q(0.5), p10:q(0.1), p90:q(0.9), mean, sd};
+}
+function accRefresh(){
+  const a=accStats();
+  $("accN").textContent=a?a.n:0;
+  const pill=$("accPat");
+  if(!a){
+    for(const id of ["accMed","accSpread","accKeep"]) $(id).textContent="—";
+    pill.textContent="—"; pill.className="pill"; $("accHist").textContent="";
+    $("accNote").textContent="Attach a true darkest position to logged readings and this fills in.";
+    return;
+  }
+  $("accMed").textContent=a.med.toFixed(1)+"°";
+  $("accSpread").textContent=a.p10.toFixed(1)+"° – "+a.p90.toFixed(1)+"°";
+  $("accKeep").textContent=(100*Math.cos(clamp(a.med,0,90)*D)**2).toFixed(0)+"% of maximum";
+  const bins=new Array(9).fill(0);
+  for(const e of a.errs) bins[Math.min(8,Math.floor(e/10))]++;
+  const mx=Math.max.apply(null,bins.concat([1]));
+  $("accHist").textContent=bins.map((c,i)=>
+    (String(i*10).padStart(2)+"–"+String((i+1)*10).padStart(2)+"°  ")+
+    "█".repeat(Math.round(18*c/mx))+(c?" "+c:"")).join("\n");
+  if(a.n<6){ pill.textContent="need ~6+"; pill.className="pill warn";
+    $("accNote").textContent="Too few readings to read a pattern yet."; return; }
+  if(a.med<8){ pill.textContent="working"; pill.className="pill ok";
+    $("accNote").textContent="Median "+a.med.toFixed(1)+"° is within the noise of judging the darkest "+
+      "point by eye. Nothing to chase."; }
+  else if(Math.abs(a.mean)>2*a.sd/Math.sqrt(a.n) && a.sd<10){
+    pill.textContent="constant offset"; pill.className="pill bad";
+    $("accNote").textContent="Errors cluster at "+a.mean.toFixed(1)+"° ± "+a.sd.toFixed(1)+
+      "° in every direction. A constant offset points at the filter calibration or the ring tracing, "+
+      "not the compass. Try adjusting ψT by "+(-a.mean).toFixed(1)+"°.";
+  } else {
+    pill.textContent="scattered"; pill.className="pill bad";
+    $("accNote").textContent="Errors scatter by ±"+a.sd.toFixed(0)+"° with mean "+a.mean.toFixed(1)+
+      "°. Direction-dependent scatter points at the compass. Run the GPS compass truth check and "+
+      "check Facing against a direction you know.";
+  }
+}
 function dbgRefresh(){
   const held=S.frozen && S.heldSnap;
-  $("dbgState").textContent = held? "held "+new Date(S.heldSnap.capturedISO).toLocaleTimeString() : "live (not held)";
+  $("dbgState").textContent = held? "held "+new Date(S.heldSnap.capturedISO).toLocaleTimeString()
+                                  : "live (not held)";
   $("dbgState").className="pill "+(held?"ok":"warn");
   $("dbgPreview").textContent=dbgSummary();
+  const sel=$("dbgPick");
+  if(sel){
+    const keep=sel.value;
+    sel.innerHTML=DBGLOG.map((e,i)=>{
+      const err=logErr(e);
+      return '<option value="'+i+'">'+(i+1)+". "+new Date(e.capturedISO).toLocaleTimeString()+
+        "  ring "+(e.solved? e.solved.psiTopShown.toFixed(1):"—")+
+        (err!==null? "  (err "+err.toFixed(1)+"°)" : "  (no truth)")+"</option>";
+    }).join("");
+    if(keep!=="" && +keep<DBGLOG.length) sel.value=keep;
+  }
+  accRefresh();
   $("dbgLog").textContent = DBGLOG.length
-    ? DBGLOG.map((e,i)=>(i+1)+". "+new Date(e.capturedISO).toLocaleTimeString()+
-        "  ring "+(e.solved?e.solved.psiTopShown:"—")+
-        "  cam "+(e.solved?e.solved.camAzUsed:"—")+
-        "  γ "+(e.solved?e.solved.gamma:"—")+
-        (e.observed&&e.observed.darkestRingDeg!==null?"  observed "+e.observed.darkestRingDeg:"")).join("\n")
+    ? DBGLOG.map((e,i)=>{ const err=logErr(e);
+        return (i+1)+". "+new Date(e.capturedISO).toLocaleTimeString()+
+          "  ring "+(e.solved?e.solved.psiTopShown.toFixed(1):"—")+
+          "  cam "+(e.solved?e.solved.camAzUsed.toFixed(1):"—")+
+          "  γ "+(e.solved?e.solved.gamma.toFixed(1):"—")+
+          (err!==null? "  truth "+e.observed.darkestRingDeg.toFixed(1)+" → err "+err.toFixed(1)+"°" : "");
+      }).join("\n")
     : "(no held readings yet)";
 }
 function dbgDownload(){
@@ -1344,13 +1465,14 @@ function dbgDownload(){
     const url=URL.createObjectURL(blob), a=document.createElement("a");
     a.href=url; a.download=dbgFilename(); document.body.appendChild(a); a.click();
     setTimeout(()=>{URL.revokeObjectURL(url); a.remove();},1000);
-    $("dbgMsg").textContent="Saved "+dbgFilename()+" to your Downloads folder. Attach it to the conversation.";
+    $("dbgMsg").textContent="Saved "+dbgFilename()+" to Downloads. Attach it to the conversation.";
   }catch(e){ $("dbgMsg").textContent="Download failed ("+e+"). Try Copy instead."; }
 }
 $("btnDbgSave").onclick=dbgDownload;
 $("btnDbgCopy").onclick=async()=>{
   const txt=dbgSummary();
-  try{ await navigator.clipboard.writeText(txt); $("dbgMsg").textContent="Summary copied — paste it into the conversation."; }
+  try{ await navigator.clipboard.writeText(txt);
+       $("dbgMsg").textContent="Summary copied — paste it into the conversation."; }
   catch(e){
     const ta=document.createElement("textarea"); ta.value=txt; document.body.appendChild(ta);
     ta.select(); try{document.execCommand("copy");}catch(_){}
@@ -1360,13 +1482,24 @@ $("btnDbgCopy").onclick=async()=>{
 $("btnDbgShare").onclick=async()=>{
   try{
     const file=new File([dbgPayload()],dbgFilename(),{type:"application/json"});
-    if(navigator.canShare && navigator.canShare({files:[file]})) await navigator.share({files:[file],title:"PolarFinder debug"});
+    if(navigator.canShare && navigator.canShare({files:[file]}))
+      await navigator.share({files:[file],title:"PolarFinder debug"});
     else await navigator.share({title:"PolarFinder debug", text:dbgSummary()});
     $("dbgMsg").textContent="Shared.";
   }catch(e){ $("dbgMsg").textContent="Share unavailable here — use Download."; }
 };
 $("btnDbgClear").onclick=()=>{ DBGLOG.length=0; dbgRefresh(); $("dbgMsg").textContent="Log cleared."; };
 $("dbgObs").oninput=dbgRefresh; $("dbgNote").oninput=dbgRefresh;
+$("btnDbgAttach").onclick=()=>{
+  const i=parseInt($("dbgPick").value,10), v=parseFloat($("dbgPickObs").value);
+  if(isNaN(i)||!DBGLOG[i]){alert("Pick a reading from the list first.");return;}
+  if(!isFinite(v)){alert("Enter the ring position that was actually darkest.");return;}
+  DBGLOG[i].observed=DBGLOG[i].observed||{};
+  DBGLOG[i].observed.darkestRingDeg=mod(v,360);
+  $("dbgPickObs").value=""; dbgRefresh();
+  $("dbgMsg").textContent="Attached "+mod(v,360).toFixed(1)+"° to reading "+(i+1)+
+    " — error "+logErr(DBGLOG[i]).toFixed(1)+"°.";
+};
 
 /* ═══════════ sensors ═══════════ */
 function orientMatrix(a,b,c){
@@ -1637,7 +1770,12 @@ document.addEventListener("visibilitychange",()=>{
   else { wakeLock=null; }
 });
 window.addEventListener("pageshow",e=>{ if(e.persisted) onResume(); });
-window.addEventListener("focus",()=>{ if(orientAge()>ORIENT_STALE*3) onResume(); });
+/* Only a real background/foreground transition should rebuild the sensors. An
+   alert() steals focus, and rebuilding on its return would discard the 30 s
+   sweep buffer and release a held reading. */
+window.addEventListener("focus",()=>{
+  if(document.visibilityState==="visible" && orientAge()>15000) onResume();
+});
 
 /* ═══════════ calibration dial ═══════════ */
 function drawCal(){
@@ -1697,8 +1835,8 @@ $("btnFreeze").onclick=()=>{
 };
 $("selFrame").onchange=e=>{S.frame=e.target.value;save();};
 $("selAim").onchange=e=>{S.aimSrc=e.target.value;$("manualBox").classList.toggle("hide",S.aimSrc!=="manual");};
-$("inAz").oninput=e=>{S.manAz=parseFloat(e.target.value)||0;};
-$("inEl").oninput=e=>{S.manEl=parseFloat(e.target.value)||0;};
+$("inAz").oninput=e=>{S.manAz=numOr(e.target.value,-3600,3600,0);};
+$("inEl").oninput=e=>{S.manEl=numOr(e.target.value,-90,90,0);};
 
 $("btnSavePsi").onclick=()=>{
   const v=parseFloat($("inPsiT").value);
@@ -1822,6 +1960,19 @@ function walkFinish(){
   const resMag=Math.abs(mod(r.diff-wf.dec+180,360)-180);
   const resTrue=Math.abs(mod(r.diff+180,360)-180);
   S.walkDiff=+r.diff.toFixed(1); S.walkDone=true;
+  /* A large residual means neither hypothesis fits: the compass itself is wrong.
+     GPS course is an absolute reference, so that measurement is worth keeping
+     rather than discarding, which is what an earlier version did. */
+  if(Math.min(resMag,resTrue)>20){
+    S.walkOffset={off:+r.diff.toFixed(1), lat:S.lat, lon:S.lon, t:Date.now()};
+    v.textContent="compass is "+Math.abs(r.diff).toFixed(0)+"° out"; v.className="pill bad";
+    $("wkNote").textContent="Your compass disagrees with GPS by "+r.diff.toFixed(1)+"°, far more than "+
+      "declination can explain. That is a bad magnetometer calibration or very strong local iron. "+
+      "First try waving the phone in a figure-of-eight for ten seconds and re-run this. If it persists, "+
+      "tap Apply to use the measured offset as a correction.";
+    $("btnWalkApply").classList.remove("hide");
+    save(); status(); return;
+  }
   if(Math.abs(wf.dec)<3){
     v.textContent="inconclusive"; v.className="pill warn";
     $("wkNote").textContent="Declination here is only "+wf.dec.toFixed(1)+"°, so the two possibilities are "+
@@ -1861,11 +2012,23 @@ $("btnWalk").onclick=()=>{
   $("btnWalk").textContent="Stop walk"; $("btnWalk").classList.add("hot");
 };
 $("btnWalkClr").onclick=()=>{
-  S.walkDone=false; S.walkDiff=null; S.northRef="mag"; $("selNorth").value="mag";
+  S.walkDone=false; S.walkDiff=null; S.walkOffset=null; S.northRef="mag"; $("selNorth").value="mag";
+  $("btnWalkApply").classList.add("hide");
   for(const id of ["wkDist","wkGps","wkMag","wkDiff"]) $(id).textContent="—";
   $("wkVerdict").textContent="—"; $("wkVerdict").className="pill";
   $("wkNote").textContent="Cleared. The app assumes magnetic north until you run the check.";
   save(); status();
+};
+$("btnWalkApply").onclick=()=>{
+  if(!S.walkOffset){alert("No measured offset to apply.");return;}
+  if(S.lat===null){alert("Need a position to anchor the correction.");return;}
+  /* Scoped to where it was measured, not applied globally. A single-direction
+     measurement is only known to hold at that spot, and a permanent worldwide
+     trim would be exactly the mistake the interference notes warn against. */
+  S.siteFix={off:+S.walkOffset.off.toFixed(2), lat:S.lat, lon:S.lon, t:Date.now(), amp:null, src:"gps-walk"};
+  save(); status(); render();
+  alert("Stored as a SITE correction of "+S.walkOffset.off.toFixed(1)+"\u00b0, active within 60 m of here "+
+        "and off beyond it. Check the Facing readout against a direction you know before trusting it.");
 };
 $("selNorth").onchange=e=>{S.northRef=e.target.value;save();status();};
 
@@ -1948,9 +2111,10 @@ function ifPaint(){
 $("btnIfA").onclick=()=>{ if(S.az===null){alert("No compass reading yet.");return;} ifA=S.az; ifPaint(); };
 $("btnIfB").onclick=()=>{ if(S.az===null){alert("No compass reading yet.");return;} ifB=S.az; ifPaint(); };
 
-$("inOff").onchange=e=>{S.off=parseFloat(e.target.value)||0;save();status();};
-$("inLat").onchange=e=>{S.lat=parseFloat(e.target.value);save();};
-$("inLon").onchange=e=>{S.lon=parseFloat(e.target.value);save();};
+$("inOff").onchange=e=>{S.off=numOr(e.target.value,-180,180,0);save();status();render();};
+const numOr=(v,lo,hi,fb)=>{const x=parseFloat(v); return (isFinite(x)&&x>=lo&&x<=hi)? x : fb;};
+$("inLat").onchange=e=>{S.lat=numOr(e.target.value,-90,90,null); S.geoLive=false; save(); status(); render();};
+$("inLon").onchange=e=>{S.lon=numOr(e.target.value,-180,180,null); save(); status(); render();};
 $("btnGeo").onclick=getGeo;
 $("btnReset").onclick=()=>{if(confirm("Erase all calibration?")){localStorage.removeItem("pf");location.reload();}};
 
@@ -1964,6 +2128,17 @@ function status(){
   b.className="pill "+(S.walkDone?"ok":"warn");
 
   const wf=declinationNow(), sd=$("stDec");
+  if(wf && decimalYear(new Date())>WMM_VALID_TO+1){
+    sd.textContent="model expired"; sd.className="pill bad";
+    $("decVal").textContent=(wf.dec>=0?"+":"")+wf.dec.toFixed(2)+"°  (extrapolated)";
+    $("decPos").textContent=S.lat.toFixed(3)+"°, "+S.lon.toFixed(3)+"°";
+    $("decH").textContent=(wf.h/1000).toFixed(1)+" µT";
+    $("decNote").textContent="The World Magnetic Model 2025 expired on 31 Dec "+WMM_VALID_TO+
+      ". These values are extrapolated and drifting. Replace the coefficients in index.html with the "+
+      "next release when it is published.";
+    handPaint(); $("inOff").value=S.off; $("selNorth").value=S.northRef;
+    return;
+  }
   if(!wf){
     sd.textContent="needs GPS"; sd.className="pill warn";
     $("decPos").textContent="—"; $("decVal").textContent="—"; $("decH").textContent="—";

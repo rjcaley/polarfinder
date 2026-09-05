@@ -175,7 +175,7 @@ four directions. Under about 3° everywhere and you can ignore it entirely.
 5. Tap **Live again**.
 
 Step 1 and step 4 are deliberately separated: the phone never needs to be near the camera at the
-moment it takes the reading. If Step 2b showed under ~3° of interference you can ignore this and
+moment it takes the reading. If the camera-interference check showed under ~3° of interference you can ignore this and
 hold everything however you like.
 
 The **polarization meter** tells you whether it's even worth fitting the filter. Below about 25%
@@ -262,7 +262,7 @@ affects the photograph.
 On the Aim tab the magnetic environment reports **the share of maximum darkness you lose**, and
 nothing else you have to interpret.
 
-**Sweep the phone slowly through about a third of a circle**, then read the verdict:
+**Sweep the phone slowly through at least 120°** (about a third of a circle), then read the verdict:
 
 | Reading | Meaning |
 |---|---|
@@ -423,6 +423,41 @@ Four fixes, all verified:
 
 ---
 
+## What this app cannot check about itself
+
+An adversarial review of v13 found seven reproducible faults. All are fixed in v14, but the honest
+summary of what remains is more useful than the list.
+
+**The sweep test cannot see the failure that actually bit.** Iron that travels *with* the phone
+produces a heading error that varies sinusoidally with heading, and the gyro-vs-compass sweep measures
+that well. Building steel, and a stale magnetometer calibration in the phone, do something different:
+they shift **every** heading by the same amount. A constant is absorbed by the fit and is invisible.
+A real rooftop measured **0.43°** on that test while the compass was **159° wrong**. The indicator is
+now labelled "iron carried with the phone" and states this limit inline, because a green "site is
+fine" on that roof was worse than no indicator at all.
+
+The only absolute check available is **GPS course over ground**, which knows nothing about magnetism.
+Run it whenever a reading looks wrong.
+
+**The estimator was validated against its own generative model.** The synthetic sweeps assume
+`d = c + A·sin(ψ−ψ₀) + drift·t + noise`. They prove the least-squares code recovers A from data obeying
+that equation. Android's rotation vector is a *fused* estimate — gyro-dominated in the short term with
+a slow magnetic correction — so during a 30 s sweep some of the "magnetic" heading is gyro integration
+too, and A is understated by a filter-dependent amount. The number is a lower bound, not a measurement.
+
+**The ring model is unverified and is not in the error budget below.** Every instruction depends on
+glyph angles traced from a single photograph and laid out with a per-character width table. Mid-word
+letters could plausibly be 3–5° out. Nothing checks this. It is measurable — photograph the filter
+square-on with a protractor overlay — and until someone does, it is an unquantified term.
+
+**WMM's 0.4° is core-field model error only.** It excludes crustal and built-environment anomalies,
+which in a city dwarf it. Treat it as a floor, not as achieved accuracy.
+
+**Phone pitch is used as the aim pitch.** If you tilt the phone back to read the screen while aiming,
+that tilt enters the calculation. For a sun to the side at 45° altitude this is worth a few degrees.
+
+---
+
 ## Independent verification
 
 Every quantitative claim is checked against implementations that share no code with the app, plus an
@@ -431,7 +466,7 @@ end-to-end simulation of the physical filter. Re-run against the shipping build:
 | Check | Method | Result |
 |---|---|---|
 | Solar position | pvlib (NREL SPA reference) | max **0.0138°** with the sun above 5° |
-| Declination | pygeomag (independent WMM), 600 global points, matched altitude | **5.7×10⁻¹⁴°** |
+| Declination | pygeomag (independent WMM), matched altitude | **<3×10⁻¹⁴°** |
 | Orientation matrix | independent Rz·Rx·Ry composition, 200 orientations | 1.7×10⁻¹⁶ |
 | Transmission-axis angle | Rayleigh Stokes/Mueller, brute-force intensity minimisation | max **0.0049°** |
 | **End-to-end instruction** | virtual filter, front-view ring geometry, 200 geometries | **100.0000%** of ideal darkening |
@@ -589,7 +624,7 @@ scattering, aerosols and ground bounce.
 - [WMM2025 model description and validity period — CIRES/CU Boulder](https://geomag.colorado.edu/wmm2025-and-wmmhr2025)
 - [Android position sensors — the rotation vector is referenced to magnetic north](https://developer.android.com/develop/sensors-and-location/sensors/sensors_position)
 
-Solar position uses the NOAA low-precision algorithm (±0.01°), verified against reference values for
+Solar position uses the USNO Astronomical Almanac low-precision algorithm (±0.01°), verified against reference values for
 the solstices and equinox at several latitudes.
 
 Declination uses the official WMM2025 coefficients (epoch 2025.0, released 2024-11-13, valid to
