@@ -481,6 +481,47 @@ end-to-end simulation of the physical filter. Re-run against the shipping build:
 
 ---
 
+## Debug capture — sending me a reading to diagnose
+
+The Debug tab records the **raw sensor input**, not just the app's answer, so the whole calculation can
+be re-run independently and compared. That is the only way to tell a wrong answer from a wrong compass.
+
+**How to use it**
+
+1. Take a reading as normal and tap **Hold reading** — that freezes a complete snapshot at that instant.
+2. Find the **true darkest** position by turning the filter and looking through it.
+3. On the Debug tab, enter that ring position, add a note, and tap **Download file**.
+4. Attach the `.json` from your Downloads folder to the conversation. **Copy** gives a shorter text
+   summary if pasting is easier; **Share…** hands it to any app.
+
+The last **20 held readings** are kept, so a whole session's tests can go in one file even if you
+forget to export each time.
+
+**Why the observed value matters so much.** The app cannot know what you saw, and that single number is
+what separates the possible causes:
+
+| Signature | Cause |
+|---|---|
+| Same error in every direction | ψ_T — the Step 1 filter calibration |
+| Error ≈ 2× the filter angle θ | handedness |
+| Error changes with direction | the compass / local iron |
+| `orientAgeMs` large | stale sensor data |
+| `siteCorrection.applied` non-zero away from the site | site correction misfiring |
+
+The file computes several of these for you — `errorIfHandednessFlippedDeg`, `ringDisagreementDeg`,
+`impliedTrueHeadingDeg` — and, importantly, carries `inversionReliable`. Where the amplification is
+below 0.5× the ring barely responds to heading, several headings fit the same observation, and the
+recovered heading can settle on the wrong one; the file says so rather than letting the number be
+trusted. The ring disagreement is always valid.
+
+**What is in the file:** app version and timestamps, device and browser, whether absolute orientation
+was ever seen, sensor and position ages, the full calibration, raw and corrected aim, sun position,
+WMM declination, site correction state, every solved intermediate, the gyro-vs-compass sweep, up to
+**400 raw orientation events** with their absolute flags, and the fusion samples. Roughly 40 KB for one
+reading. Nothing leaves the phone until you choose to send it.
+
+---
+
 ## Troubleshooting
 
 **The ring angle flips between two values that are far apart** — fixed in v5, and worth understanding

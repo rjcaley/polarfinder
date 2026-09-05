@@ -77,6 +77,7 @@ hr{border:0;border-top:1px solid var(--line);margin:12px 0}
   <button id="tabAim" class="on">Aim</button>
   <button id="tabCal">Calibrate</button>
   <button id="tabHelp">Physics</button>
+  <button id="tabDbg">Debug</button>
 </div>
 
 <!-- ══════════════════ AIM ══════════════════ -->
@@ -434,12 +435,59 @@ hr{border:0;border-top:1px solid var(--line);margin:12px 0}
   </div>
 </div>
 
+<!-- ══════════════════ DEBUG ══════════════════ -->
+<div id="paneDbg" class="hide">
+  <div class="card">
+    <h1>Capture a reading for diagnosis</h1>
+    <div class="note">This records the <b>raw sensor input</b> — not just the app's answer — so the whole
+      calculation can be re-run independently and compared. Without that, a wrong reading cannot be told
+      apart from a wrong compass.
+      <br><br><b>The one thing the app cannot know is what you actually saw.</b> Fill that in and the
+      cause becomes identifiable: a constant error means the filter calibration, an error of twice the
+      filter angle means handedness, an error that changes with direction means the compass.</div>
+    <ol class="steps">
+      <li>Take a reading as normal and tap <b>Hold reading</b>. That freezes a full snapshot.</li>
+      <li>Find the <b>true darkest</b> position by turning the filter and looking through it.</li>
+      <li>Enter that ring position below, add a note, then Download or Copy.</li>
+    </ol>
+    <div class="kv"><span class="dim">Snapshot</span><span id="dbgState" class="pill">none held</span></div>
+    <label style="margin-top:8px">Ring position that was actually darkest (° — or leave blank)</label>
+    <input id="dbgObs" type="number" step="0.5" placeholder="e.g. 5.3">
+    <label style="margin-top:8px">What happened, in your words</label>
+    <input id="dbgNote" type="text" placeholder="street level, facing the park, app said X, truth was Y">
+    <div class="row" style="margin-top:10px">
+      <button id="btnDbgSave" class="pri grow">Download file</button>
+      <button id="btnDbgCopy" class="grow">Copy</button>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button id="btnDbgShare" class="grow sm">Share…</button>
+      <button id="btnDbgClear" class="sm">Clear log</button>
+    </div>
+    <div class="tiny dim" style="margin-top:8px" id="dbgMsg">The file lands in your Downloads folder —
+      attach it to the conversation. Copy puts a shorter summary on the clipboard if you would rather
+      paste it.</div>
+  </div>
+
+  <div class="card">
+    <h1>Reading log</h1>
+    <div class="tiny dim">The last 20 held readings are kept, so a session's worth of tests can be sent
+      in one file even if you forget to export each time.</div>
+    <div id="dbgLog" class="tiny mono" style="margin-top:8px;white-space:pre-wrap;line-height:1.5"></div>
+  </div>
+
+  <div class="card">
+    <h1>Live snapshot preview</h1>
+    <div class="tiny mono" id="dbgPreview" style="white-space:pre-wrap;word-break:break-all;line-height:1.45;max-height:340px;overflow:auto"></div>
+  </div>
+</div>
+
 <div class="tiny dim" style="text-align:center;padding:14px 0 4px">
   Works offline · add to home screen
 </div>
 
 <script>
 "use strict";
+const APP_VERSION="v12";
 const D=Math.PI/180, R2D=180/Math.PI;
 const $=id=>document.getElementById(id);
 const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
@@ -675,7 +723,7 @@ const S={
   az:null, el:null, roll:null, absOK:false, aimSpread:0, geoLive:false,
   frozen:false, frame:"level",
   aimSrc:"sensor", manAz:0, manEl:0,
-  calPsi:0, ringShown:0
+  calPsi:0, ringShown:0, heldSnap:null
 };
 function save(){
   localStorage.setItem("pf", JSON.stringify({
@@ -1141,6 +1189,185 @@ function magPaint(R){
     "correction covers that case.");
 }
 
+/* ═══════════ diagnostics ═══════════
+   The raw orientation events are kept verbatim. With alpha/beta/gamma, the
+   absolute flag and a timestamp, the entire calculation can be reproduced from
+   scratch off-device and compared against what the app decided — which is the
+   only way to tell a wrong answer from a wrong sensor. */
+const RAW=[];                     // last N raw orientation events
+const RAWMAX=400;
+function noteRaw(e,isAbs){
+  RAW.push({t:Math.round(nowMs()), a:+(+e.alpha).toFixed(3), b:+(+e.beta).toFixed(3),
+            g:+(+e.gamma).toFixed(3), abs:!!isAbs,
+            wk: typeof e.webkitCompassHeading==="number"? +e.webkitCompassHeading.toFixed(2):null});
+  if(RAW.length>RAWMAX) RAW.splice(0,RAW.length-RAWMAX);
+}
+const DBGLOG=[];                  // held readings this session
+function buildSnapshot(tag){
+  try{
+    const R=lastSolve, wf=declinationNow(), so=siteOffset(), fc=fieldConsistency(), mg=magnetics();
+    return {
+      schema:"polarfinder-debug/2",
+      appVersion:APP_VERSION,
+      tag:tag||"manual",
+      capturedISO:new Date().toISOString(),
+      capturedLocal:new Date().toString(),
+      device:{
+        ua:navigator.userAgent, platform:navigator.platform||null,
+        lang:navigator.language, dpr:window.devicePixelRatio,
+        screen:[screen.width,screen.height],
+        standalone: window.matchMedia && window.matchMedia("(display-mode: standalone)").matches,
+        secure: window.isSecureContext, tzOffsetMin:new Date().getTimezoneOffset()
+      },
+      sensors:{
+        sawAbsolute, listenersOn,
+        orientAgeMs: isFinite(orientAge())? Math.round(orientAge()):null,
+        geoAgeMs: isFinite(geoAge())? Math.round(geoAge()):null,
+        geoLive:S.geoLive, aimSpreadDeg:+(S.aimSpread||0).toFixed(2),
+        magnetometer: MAG.on? {F:+MAG.F.toFixed(2), dip:+MAG.dip.toFixed(2), n:MAG.n} : {available:false, err:MAG.err}
+      },
+      calibration:{
+        psiT:S.psiT, hand:S.hand, handDone:S.handDone,
+        hdPsi1:S.hdPsi1, hdPsi2:S.hdPsi2, hdTurn:S.hdTurn,
+        northRef:S.northRef, walkDone:S.walkDone, walkDiff:S.walkDiff,
+        manualTrim:S.off, siteFix:S.siteFix, frame:S.frame, aimSrc:S.aimSrc
+      },
+      position: S.lat===null? null : {lat:+S.lat.toFixed(6), lon:+S.lon.toFixed(6), accM:S.acc},
+      rawAim: {az:S.az===null?null:+S.az.toFixed(3), el:S.el===null?null:+S.el.toFixed(3),
+               rollVec:S.roll? S.roll.map(x=>+x.toFixed(5)):null,
+               manualAz:S.manAz, manualEl:S.manEl},
+      declination: wf? {dec:+wf.dec.toFixed(4), inc:+wf.inc.toFixed(3), F_nT:Math.round(wf.f), H_nT:Math.round(wf.h)} : null,
+      siteCorrection:{applied:so.off, active:so.active, distM:so.dist===null?null:Math.round(so.dist), stale:!!so.stale},
+      solved: R? {
+        sunAz:+R.sp.az.toFixed(3), sunAlt:+R.sp.alt.toFixed(3),
+        camAzUsed:+R.camAz.toFixed(3), camEl:+R.camEl.toFixed(3),
+        gamma:+R.gamma.toFixed(3), thetaImagePlane:+R.theta.toFixed(3),
+        P:+R.P.toFixed(4), brightDarkRatio:+R.ratio.toFixed(3),
+        amplification:+R.amp.toFixed(4), psiTopShown:+R.psiTop.toFixed(3),
+        instruction:$("instr").textContent, detail:$("instr2").textContent
+      } : null,
+      magneticCheck: fc.ready? {coverageDeg:+fc.coverage.toFixed(1), amplitudeDeg:+fc.A.toFixed(2),
+                                seDeg:isFinite(fc.se)?+fc.se.toFixed(2):null, rmsDeg:+fc.rms.toFixed(2), n:fc.n}
+                             : {ready:false, coverageDeg:+(fc.coverage||0).toFixed(1)},
+      magnetometerCheck: mg&&mg.known? {F:+mg.F.toFixed(2),dip:+mg.dip.toFixed(2),
+                                        headErrDeg:+mg.headErr.toFixed(2)} : null,
+      observed:{ darkestRingDeg:null, note:null },
+      rawOrientationEvents: RAW.slice(-RAWMAX),
+      fusionSamples: FUSE.buf.slice(-300).map(x=>({t:Math.round(x.t), d:+x.d.toFixed(3), h:+x.h.toFixed(3)}))
+    };
+  }catch(err){
+    return {schema:"polarfinder-debug/2", error:String(err&&err.stack||err), capturedISO:new Date().toISOString()};
+  }
+}
+function currentSnapshot(){
+  const s=(S.frozen && S.heldSnap) ? JSON.parse(JSON.stringify(S.heldSnap)) : buildSnapshot("live");
+  const o=parseFloat($("dbgObs").value);
+  s.observed={ darkestRingDeg: isNaN(o)? null : o, note: $("dbgNote").value || null };
+  if(s.observed.darkestRingDeg!==null && s.solved && s.calibration.psiT!==null){
+    let dr=Math.abs(mod(s.observed.darkestRingDeg-s.solved.psiTopShown,180));
+    dr=Math.min(dr,180-dr);
+    s.observed.ringDisagreementDeg=+dr.toFixed(2);
+    s.observed.darkeningKeptPct=+(100*Math.cos(clamp(dr,0,90)*D)**2).toFixed(1);
+    s.observed.errorIfHandednessFlippedDeg=+(2*s.solved.thetaImagePlane).toFixed(1);
+    /* Invert the geometry properly rather than dividing by the local derivative.
+       Over a large error the derivative is not constant, and where amplification
+       is small that linearisation is badly wrong — exactly the case where the
+       heading error is biggest and most worth knowing. */
+    try{
+      const sv=dir(s.solved.sunAz,s.solved.sunAlt);
+      const thObs=mod((mod(s.observed.darkestRingDeg,180)-S.psiT)*S.hand,180);
+      const inv=headingFromAxis(sv,s.solved.camEl,thObs,s.solved.camAzUsed);
+      s.observed.impliedTrueHeadingDeg=+inv.az.toFixed(2);
+      s.observed.impliedHeadingErrDeg=+inv.offset.toFixed(2);
+      s.observed.inversionAmbiguous=!!inv.ambiguous;
+      s.observed.inversionRivalOffsetDeg=inv.rivalOffset===null?null:+inv.rivalOffset.toFixed(2);
+      s.observed.linearisedHeadingErrDeg = s.solved.amplification>0.02
+        ? +(dr/s.solved.amplification).toFixed(1) : null;   // kept for comparison
+      /* Below about 0.5x amplification the ring hardly responds to heading, so
+         many headings fit the same observation and the inversion can settle on
+         the wrong one. Say so in the file rather than let the number be trusted. */
+      s.observed.inversionReliable = s.solved.amplification>=0.5 && !inv.ambiguous;
+      s.observed.inversionNote = s.observed.inversionReliable
+        ? "amplification "+s.solved.amplification.toFixed(2)+"x — heading recovery is well conditioned"
+        : "amplification only "+s.solved.amplification.toFixed(2)+"x"+(inv.ambiguous?" and multiple roots fit":"")+
+          " — the recovered heading is NOT reliable here; the ring disagreement is still valid";
+    }catch(e){ s.observed.inversionError=String(e); }
+  }
+  return s;
+}
+function dbgFilename(){
+  const d2=new Date(), p=n=>String(n).padStart(2,"0");
+  return "polarfinder-"+d2.getFullYear()+p(d2.getMonth()+1)+p(d2.getDate())+"-"+p(d2.getHours())+p(d2.getMinutes())+p(d2.getSeconds())+".json";
+}
+function dbgPayload(){
+  return JSON.stringify({schema:"polarfinder-debug/2", appVersion:APP_VERSION,
+    exportedISO:new Date().toISOString(), current:currentSnapshot(), log:DBGLOG}, null, 1);
+}
+function dbgSummary(){
+  const s=currentSnapshot();
+  if(s.error) return "PolarFinder debug: snapshot failed — "+s.error;
+  const L=[];
+  L.push("PolarFinder "+s.appVersion+"  "+s.capturedISO+"  ("+s.tag+")");
+  L.push("cal: psiT="+s.calibration.psiT+" hand="+s.calibration.hand+" handDone="+s.calibration.handDone+
+         " northRef="+s.calibration.northRef+" trim="+s.calibration.manualTrim+" frame="+s.calibration.frame+
+         " aimSrc="+s.calibration.aimSrc);
+  L.push("site: "+JSON.stringify(s.siteCorrection)+"  fix="+JSON.stringify(s.calibration.siteFix));
+  L.push("pos: "+JSON.stringify(s.position)+"  geoAge="+s.sensors.geoAgeMs+"ms orientAge="+s.sensors.orientAgeMs+"ms");
+  L.push("rawAim: az="+s.rawAim.az+" el="+s.rawAim.el+" spread="+s.sensors.aimSpreadDeg+"  sawAbsolute="+s.sensors.sawAbsolute);
+  L.push("decl: "+JSON.stringify(s.declination));
+  if(s.solved) L.push("solved: sun "+s.solved.sunAz+"/"+s.solved.sunAlt+"  cam "+s.solved.camAzUsed+"/"+s.solved.camEl+
+    "  gamma "+s.solved.gamma+"  theta "+s.solved.thetaImagePlane+"  amp "+s.solved.amplification+
+    "  P "+s.solved.P+"  ring "+s.solved.psiTopShown);
+  if(s.solved) L.push("shown: "+s.solved.instruction+" | "+s.solved.detail);
+  L.push("magCheck: "+JSON.stringify(s.magneticCheck));
+  L.push("observed: "+JSON.stringify(s.observed));
+  L.push("rawEvents="+s.rawOrientationEvents.length+" fusion="+s.fusionSamples.length+
+         "  (download the JSON for those)");
+  return L.join("\n");
+}
+function dbgRefresh(){
+  const held=S.frozen && S.heldSnap;
+  $("dbgState").textContent = held? "held "+new Date(S.heldSnap.capturedISO).toLocaleTimeString() : "live (not held)";
+  $("dbgState").className="pill "+(held?"ok":"warn");
+  $("dbgPreview").textContent=dbgSummary();
+  $("dbgLog").textContent = DBGLOG.length
+    ? DBGLOG.map((e,i)=>(i+1)+". "+new Date(e.capturedISO).toLocaleTimeString()+
+        "  ring "+(e.solved?e.solved.psiTopShown:"—")+
+        "  cam "+(e.solved?e.solved.camAzUsed:"—")+
+        "  γ "+(e.solved?e.solved.gamma:"—")+
+        (e.observed&&e.observed.darkestRingDeg!==null?"  observed "+e.observed.darkestRingDeg:"")).join("\n")
+    : "(no held readings yet)";
+}
+function dbgDownload(){
+  try{
+    const blob=new Blob([dbgPayload()],{type:"application/json"});
+    const url=URL.createObjectURL(blob), a=document.createElement("a");
+    a.href=url; a.download=dbgFilename(); document.body.appendChild(a); a.click();
+    setTimeout(()=>{URL.revokeObjectURL(url); a.remove();},1000);
+    $("dbgMsg").textContent="Saved "+dbgFilename()+" to your Downloads folder. Attach it to the conversation.";
+  }catch(e){ $("dbgMsg").textContent="Download failed ("+e+"). Try Copy instead."; }
+}
+$("btnDbgSave").onclick=dbgDownload;
+$("btnDbgCopy").onclick=async()=>{
+  const txt=dbgSummary();
+  try{ await navigator.clipboard.writeText(txt); $("dbgMsg").textContent="Summary copied — paste it into the conversation."; }
+  catch(e){
+    const ta=document.createElement("textarea"); ta.value=txt; document.body.appendChild(ta);
+    ta.select(); try{document.execCommand("copy");}catch(_){}
+    ta.remove(); $("dbgMsg").textContent="Summary copied (fallback).";
+  }
+};
+$("btnDbgShare").onclick=async()=>{
+  try{
+    const file=new File([dbgPayload()],dbgFilename(),{type:"application/json"});
+    if(navigator.canShare && navigator.canShare({files:[file]})) await navigator.share({files:[file],title:"PolarFinder debug"});
+    else await navigator.share({title:"PolarFinder debug", text:dbgSummary()});
+    $("dbgMsg").textContent="Shared.";
+  }catch(e){ $("dbgMsg").textContent="Share unavailable here — use Download."; }
+};
+$("btnDbgClear").onclick=()=>{ DBGLOG.length=0; dbgRefresh(); $("dbgMsg").textContent="Log cleared."; };
+$("dbgObs").oninput=dbgRefresh; $("dbgNote").oninput=dbgRefresh;
+
 /* ═══════════ sensors ═══════════ */
 function orientMatrix(a,b,c){
   const cA=Math.cos(a*D),sA=Math.sin(a*D),cB=Math.cos(b*D),sB=Math.sin(b*D),
@@ -1166,6 +1393,7 @@ const OWIN=1000;                    // ms of history to average over
 
 function handleOrient(e,isAbs){
   if(e.alpha===null||e.alpha===undefined) return;
+  noteRaw(e,isAbs);
   if(isAbs) sawAbsolute=true;
   lastOrientT=nowMs();
   const M=orientMatrix(e.alpha,e.beta,e.gamma);
@@ -1215,6 +1443,7 @@ function headingOf(e){
 }
 function noteRelative(e){
   if(e.alpha===null||e.alpha===undefined) return;
+  noteRaw(e,false);
   const now=(typeof performance!=="undefined"&&performance.now)?performance.now():Date.now();
   FUSE.rel={t:now,h:headingOf(e)};
   pairFuse(now);
@@ -1395,7 +1624,7 @@ async function onResume(){
   getGeo(true);
   startMagnetometer();
   if(S.frozen){                   // never let a held reading survive a journey
-    S.frozen=false;
+    S.frozen=false; S.heldSnap=null;
     $("btnFreeze").textContent="Hold reading";
     $("btnFreeze").classList.remove("hot");
     $("ringCard").classList.remove("frozen");
@@ -1440,23 +1669,31 @@ makeDial("hdRing",  ()=>S.hdDial, v=>{S.hdDial=v;}, drawHd);
 
 /* ═══════════ UI wiring ═══════════ */
 function tab(n){
-  for(const [b,p] of [["tabAim","paneAim"],["tabCal","paneCal"],["tabHelp","paneHelp"]]){
+  for(const [b,p] of [["tabAim","paneAim"],["tabCal","paneCal"],["tabHelp","paneHelp"],["tabDbg","paneDbg"]]){
     const act=(b==="tab"+n);
     $(b).classList.toggle("on",act);
     $(p).classList.toggle("hide",!act);
   }
   if(n==="Cal"){ drawCal(); drawHd(); handPaint(); }
+  if(n==="Dbg") dbgRefresh();
 }
 $("tabAim").onclick=()=>tab("Aim");
 $("tabCal").onclick=()=>tab("Cal");
 $("tabHelp").onclick=()=>tab("Help");
+$("tabDbg").onclick=()=>tab("Dbg");
 
 $("btnStart").onclick=startSensors;
 $("btnFreeze").onclick=()=>{
   S.frozen=!S.frozen;
+  if(S.frozen){
+    S.heldSnap=buildSnapshot("held");          // freeze the evidence with the reading
+    DBGLOG.push(S.heldSnap);
+    while(DBGLOG.length>20) DBGLOG.shift();
+  }
   $("btnFreeze").textContent=S.frozen?"Live again":"Hold reading";
   $("btnFreeze").classList.toggle("hot",S.frozen);
   $("ringCard").classList.toggle("frozen",S.frozen);
+  dbgRefresh();
 };
 $("selFrame").onchange=e=>{S.frame=e.target.value;save();};
 $("selAim").onchange=e=>{S.aimSrc=e.target.value;$("manualBox").classList.toggle("hide",S.aimSrc!=="manual");};
@@ -1760,7 +1997,7 @@ function status(){
 /* boot */
 $("selFrame").value=S.frame; $("selNorth").value=S.northRef; $("selTurn").value=String(S.hdTurn);
 if(S.psiT!==null) S.calPsi=S.psiT;
-status(); drawCal(); drawHd(); handPaint(); render();
+status(); drawCal(); drawHd(); handPaint(); render(); dbgRefresh();
 setInterval(render,250);
 if("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(()=>{});
 </script>
