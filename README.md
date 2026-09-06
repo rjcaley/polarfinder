@@ -42,6 +42,71 @@ anywhere. The app makes no network requests at all after loading.
 
 ---
 
+## Part 1b — Aiming: sight once, then the gyroscope carries it
+
+**This is the change that matters.** Almost every hard problem in earlier versions existed because the
+aim came from the magnetometer: declination, the walk test, site corrections, geofences, the magnetic
+verdict — and the 159° failure on the roof. None of it is needed.
+
+The solve only wants the sun's direction *relative to where you are pointing*. Sun altitude and azimuth
+come from the clock and a rough position, with no compass at all. The single unknown is your heading —
+and the gyroscope tracks heading changes perfectly, it just doesn't know where it started. **One
+sighting supplies that starting point.** Iron cannot touch a gyroscope.
+
+> trueAzimuth = gyroAzimuth + yawOffset, where yawOffset is fixed by one sighting.
+
+### Sighting the sun — never look at it
+
+1. Hold the phone upright in front of you, screen toward you.
+2. Turn on the spot until the phone's **shadow is as narrow as possible** — a thin line on the ground or
+   your hand. You are looking down at a shadow, roughly 90° away from the sun.
+3. Tap **Sun on my LEFT** or **Sun on my RIGHT**.
+
+The thin-shadow position is a *sharp* setting, unlike "point at the sun", which is why this is both
+safer and more accurate. The app knows the sun's true azimuth, so edge-on means your aim is that
+azimuth ∓ 90°.
+
+### When a building hides the sun — sight a street or a landmark
+
+Manhattan is unusually good for this. The 1811 grid runs **29° east of true north**, which is why
+Manhattanhenge falls at azimuth 299°. Stand in the roadway or square to the kerb, point the phone along
+it, and pick the preset:
+
+| Looking | True bearing |
+|---|---:|
+| Up an avenue (uptown) | **29°** |
+| Down an avenue (downtown) | **209°** |
+| East along a cross street | **119°** |
+| West along a cross street | **299°** |
+
+Outside the grid, use **Something else** and type any bearing you know: a landmark you can read off a
+map, a runway heading, a road on a compass rose. Sight down a *long* line rather than a short one — the
+further the reference, the smaller the angular error.
+
+### Accuracy, and why this beats the compass
+
+Simulated with realistic sighting error and gyro drift:
+
+| Sighting error | Drift | Minutes later | Median aim error |
+|---:|---:|---:|---:|
+| 2° | 0.5°/min | 1 | **1.4°** |
+| 2° | 0.5°/min | 2 | **1.6°** |
+| 3° | 1°/min | 3 | 2.5° |
+| 3° | 2°/min | 5 | 6.8° |
+
+Against 3–8° for a *clean* magnetometer, and 159° for the one that broke the roof test. Verified in
+software: after one sighting the app recovered true azimuth at seven headings to **0.000°**.
+
+**Drift is the only enemy, and it is visible.** The reference pill shows the age: green under two
+minutes, amber after, expired past ten. **Re-sight every couple of minutes** — it takes five seconds.
+If the app is backgrounded the gyro restarts and the sighting is discarded rather than silently
+reused; you will be told to sight again.
+
+Compass mode is still there under **Aim source**, now labelled a fallback. Everything about
+declination, site corrections and magnetic checks applies only to it.
+
+---
+
 ## Part 2 — Calibration: one five-minute session, and that's it
 
 Everything now happens at a single puddle or glass tabletop. **No sun, no compass, no GPS, no straight
@@ -55,6 +120,16 @@ arbitrary angle relative to "46" — fixed forever once you measure it.
 **The reference:** light reflecting off a horizontal, non-metallic surface is polarized **horizontally**.
 That is Fresnel's law, and it needs no sun and no assumptions. So the filter position that kills such a
 reflection is, by definition, the one with its transmission axis **vertical**.
+
+**Bracket the minimum — do not hunt for "darkest".** A polarizer minimum is *flat*: five degrees
+either side changes brightness by about 0.2%, which no eye can detect. Twenty degrees off, brightness
+changes twenty times faster. So:
+
+1. Turn well past the dark point until the reflection is clearly back — call that **A**.
+2. Turn back the other way until it looks **equally bright** — that is **B**.
+3. The true minimum is halfway between. The app has an A/B box that halves them for you.
+
+Simulated, this is about **4× more accurate** than eyeballing the minimum: median 1.2° against 4.7°.
 
 1. Find a horizontal shiny non-metal surface with a reflection in it — a glass tabletop, polished wood,
    a puddle, a car's paint, a phone screen face-up under a lamp.
@@ -208,6 +283,7 @@ now looks like this:
 |---|---:|---|
 | Solar position | 0.01° | NOAA algorithm, verified against reference values |
 | Declination (WMM2025) | 0.4° | NOAA's published uncertainty for D |
+| Ring model vs. the real engraving | 1.2° | measured; 3.6° worst glyph. See below |
 | Filter axis, Step 1 | 2–5° | your judgement of "darkest" and of level |
 | Phone magnetometer | 3–8° | the dominant term, and irreducible |
 | Camera interference | 0–15° | avoidable: keep the M away while reading |
@@ -445,10 +521,26 @@ that equation. Android's rotation vector is a *fused* estimate — gyro-dominate
 a slow magnetic correction — so during a 30 s sweep some of the "magnetic" heading is gyro integration
 too, and A is understated by a filter-dependent amount. The number is a lower bound, not a measurement.
 
-**The ring model is unverified and is not in the error budget below.** Every instruction depends on
-glyph angles traced from a single photograph and laid out with a per-character width table. Mid-word
-letters could plausibly be 3–5° out. Nothing checks this. It is measurable — photograph the filter
-square-on with a protractor overlay — and until someone does, it is an unquantified term.
+**The ring model has now been measured.** Two photographs of the filter, the second rotated 93°
+from the first, were each processed independently: fit the glass aperture edge, de-project, unwrap
+the engraving band, and locate every character. All 41 glyphs were found in both. Against the app's
+model the residual is **1.19° rms, 0.95° median, 3.6° at the worst single character** — costing
+0.03% of the achievable darkening typically and 0.39% at that worst character. The two photographs
+agree with each other on word positions to 0.25° rms, so the measurement itself is not the limit.
+
+Refitting the four word arcs to the measurement lowers the rms only to 1.02°; also refitting the
+per-character width table reaches 0.74° but produces widths that are plainly nonsense (K wider than
+M, S narrower than I) — that is fitting the segmenter's noise, not the engraving. Neither change is
+worth making. The ring model stays as traced.
+
+One trap is worth recording, because it cost several wrong answers before it was spotted: the mount
+is a cylinder about 5 mm tall, so what the camera sees as the filter's outline is the outline of that
+*cylinder*, and its centre is displaced from the centre of the engraved front face by roughly
+(height × tan tilt). At the ~10° tilt in these photographs that is about 100 px, worth 5° of angular
+error — larger than the thing being measured. Fitting the glass aperture edge instead, which lies in
+the front-face plane, removes it. The check that this worked: the aperture is round to within an axis
+ratio of 0.998, and the two photographs' recovered rotation differs by 93.2° and 89.0° by two
+independent routes, against a filter that was turned by roughly a right angle.
 
 **WMM's 0.4° is core-field model error only.** It excludes crustal and built-environment anomalies,
 which in a city dwarf it. Treat it as a floor, not as achieved accuracy.
@@ -516,44 +608,43 @@ end-to-end simulation of the physical filter. Re-run against the shipping build:
 
 ---
 
-## Debug capture — sending me a reading to diagnose
+## The field logbook — running the accuracy study
 
-The Debug tab records the **raw sensor input**, not just the app's answer, so the whole calculation can
-be re-run independently and compared. That is the only way to tell a wrong answer from a wrong compass.
+Every other check in this app compares the app against its own model. This one compares it against the
+sky, and it is the only thing that can say whether the app works.
 
-**How to use it**
+**The loop**
 
-1. Take a reading as normal and tap **Hold reading** — that freezes a complete snapshot at that instant.
+1. Take a reading and tap **Hold reading**. A row appears in the Debug tab's logbook with the full
+   sensor snapshot frozen at that instant.
 2. Find the **true darkest** position by turning the filter and looking through it.
-3. On the Debug tab, enter that ring position, add a note, and tap **Download file**.
-4. Attach the `.json` from your Downloads folder to the conversation. **Copy** gives a shorter text
-   summary if pasting is easier; **Share…** hands it to any app.
+3. On the Debug tab, tap that row, pick the **marking** that was darkest from the dropdown — by name,
+   `"N" of GERMANY`, not degrees — set confidence, add a note, **Save row**.
+4. Repeat 20–30 times across **different directions, times of day, days and places**.
+5. **Export file** and send it.
 
-The last **20 held readings** are kept, so a whole session's tests can go in one file even if you
-forget to export each time.
+**Answers to the things you asked**
 
-**Why the observed value matters so much.** The app cannot know what you saw, and that single number is
-what separates the possible causes:
+- **No offset to type.** There is an *Extra compass trim* box under Manual overrides on the Calibrate
+  tab, but you should not need it and I would leave it at zero. The GPS walk check no longer writes a
+  global trim; it stores a location-scoped site correction instead.
+- **Letters, not degrees.** The truth picker lists all 41 engraved characters with their word, so you
+  choose `"R" of MASTER` or `"6" of 46`. A **Nudge** field handles a minimum that sat between two
+  letters — positive toward MASTER, negative back toward "46". Either 180° twin is fine; the app
+  reduces both modulo 180.
+- **Dates.** Yes, now. Each row stores a full ISO timestamp, the table has a Date column, and the
+  header tracks **days covered** and **directions covered (of 8 octants)** so you can see whether the
+  study is well spread.
+- **It survives closing the app.** This was the real gap: the log used to live in memory only, so a
+  multi-day study would have evaporated. It is now persisted, capped at 60 rows, and *not* deleted by
+  the calibration reset button. 25 rows occupy about 44 KB.
 
-| Signature | Cause |
-|---|---|
-| Same error in every direction | ψ_T — the Step 1 filter calibration |
-| Error ≈ 2× the filter angle θ | handedness |
-| Error changes with direction | the compass / local iron |
-| `orientAgeMs` large | stale sensor data |
-| `siteCorrection.applied` non-zero away from the site | site correction misfiring |
+**What good spread looks like:** all 8 octants, at least 3 days, a mix of high and low sun. The pattern
+box then classifies the result — *working*, *constant offset* (points at ψ_T or the ring tracing, and
+it suggests the correction), or *scattered* (points at the compass).
 
-The file computes several of these for you — `errorIfHandednessFlippedDeg`, `ringDisagreementDeg`,
-`impliedTrueHeadingDeg` — and, importantly, carries `inversionReliable`. Where the amplification is
-below 0.5× the ring barely responds to heading, several headings fit the same observation, and the
-recovered heading can settle on the wrong one; the file says so rather than letting the number be
-trusted. The ring disagreement is always valid.
-
-**What is in the file:** app version and timestamps, device and browser, whether absolute orientation
-was ever seen, sensor and position ages, the full calibration, raw and corrected aim, sun position,
-WMM declination, site correction state, every solved intermediate, the gyro-vs-compass sweep, up to
-**400 raw orientation events** with their absolute flags, and the fusion samples. Roughly 40 KB for one
-reading. Nothing leaves the phone until you choose to send it.
+**Confidence matters.** Mark a broad, hard-to-place minimum as such. Low-polarization geometries give
+mushy minima, and knowing which rows were mushy stops them being read as app error.
 
 ---
 

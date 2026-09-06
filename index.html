@@ -83,6 +83,54 @@ hr{border:0;border-top:1px solid var(--line);margin:12px 0}
 <!-- ══════════════════ AIM ══════════════════ -->
 <div id="paneAim">
 
+  <div class="card" id="sightCard">
+    <div class="row" style="margin-bottom:6px">
+      <div class="grow" style="font-weight:600">Aim reference</div>
+      <span id="sightPill" class="pill bad">not sighted</span>
+    </div>
+    <div class="tiny dim" id="sightState" style="margin-bottom:8px"></div>
+    <div class="row">
+      <button id="btnSightSun" class="pri grow sm">Sight the sun</button>
+      <button id="btnSightBrg" class="grow sm">Sight a bearing</button>
+    </div>
+
+    <div id="sunBox" class="hide" style="margin-top:10px;border-top:1px solid var(--line);padding-top:10px">
+      <div class="note"><b>Do not look at the sun.</b> Watch its shadow instead.
+        <br>1. Hold the phone upright in front of you, screen toward you.
+        <br>2. Turn on the spot until the phone's <b>shadow is as narrow as possible</b> — a thin
+        line on the ground or your hand. That is a sharp setting, far easier to judge than
+        pointing at the sun.
+        <br>3. Tap whichever side the sun is on.</div>
+      <div class="row" style="margin-top:8px">
+        <button id="btnSunLeft" class="pri grow sm">Sun on my LEFT</button>
+        <button id="btnSunRight" class="pri grow sm">Sun on my RIGHT</button>
+      </div>
+      <div class="tiny dim" style="margin-top:6px" id="sunHint"></div>
+    </div>
+
+    <div id="brgBox" class="hide" style="margin-top:10px;border-top:1px solid var(--line);padding-top:10px">
+      <div class="note">Point the phone's back along something whose true bearing you know, then tap
+        Sight. <b>Useful when a building hides the sun.</b> A street grid is an excellent reference —
+        far better than any compass.</div>
+      <label style="margin-top:8px">Reference</label>
+      <select id="selBrg">
+        <option value="29">Manhattan avenue, looking uptown — 29°</option>
+        <option value="209">Manhattan avenue, looking downtown — 209°</option>
+        <option value="119">Manhattan cross street, looking east — 119°</option>
+        <option value="299">Manhattan cross street, looking west — 299°</option>
+        <option value="custom">Something else — type the bearing</option>
+      </select>
+      <div id="brgCustom" class="hide" style="margin-top:8px">
+        <label>True bearing of what you are pointing at (°)</label>
+        <input id="inBrg" type="number" step="1" placeholder="e.g. 247">
+      </div>
+      <button id="btnBrgTake" class="pri" style="width:100%;margin-top:8px">Sight now</button>
+      <div class="tiny dim" style="margin-top:6px">Stand in the middle of the roadway or square-on to
+        the kerb line and sight down it. The Manhattan grid runs 29° east of true north, which is why
+        Manhattanhenge falls at azimuth 299°.</div>
+    </div>
+  </div>
+
   <div class="card" id="ringCard">
     <div class="row" style="margin-bottom:6px">
       <div class="grow tiny dim">Rotate the filter until this marking sits at the top of your lens</div>
@@ -126,7 +174,7 @@ hr{border:0;border-top:1px solid var(--line);margin:12px 0}
     <div class="kv"><span class="dim">Aim error amplification</span><b id="kAmp" class="mono">—</b></div>
     <div class="tiny dim" id="dopNote" style="margin-top:6px"></div>
     <hr>
-    <div class="row"><div class="grow" style="font-weight:600">Iron carried with the phone</div><span id="magPill" class="pill">—</span></div>
+    <div class="row"><div class="grow" style="font-weight:600">Iron carried with the phone <span class="tiny dim">(compass mode only)</span></div><span id="magPill" class="pill">—</span></div>
     <div class="tiny dim" id="magNote" style="margin-top:6px"></div>
   </div>
 
@@ -148,8 +196,9 @@ hr{border:0;border-top:1px solid var(--line);margin:12px 0}
       <div>
         <label>Aim source</label>
         <select id="selAim">
-          <option value="sensor">Phone compass</option>
-          <option value="manual">Type it in</option>
+          <option value="sight">Sighting + gyro (best)</option>
+          <option value="manual">Type a true bearing</option>
+          <option value="sensor">Phone compass (fallback)</option>
         </select>
       </div>
     </div>
@@ -192,6 +241,23 @@ hr{border:0;border-top:1px solid var(--line);margin:12px 0}
       <li>Without rotating it further, read which marking is at the <b>top</b> of the filter and enter it below.
         Use the dial to match what you see.</li>
     </ol>
+    <div class="note" style="border-left:3px solid var(--ok);padding-left:10px">
+      <b>Bracket the minimum — do not eyeball it.</b> A polarizer minimum is <i>flat</i>: five degrees
+      either side of perfect changes the brightness by about 0.2%, which no eye can see. Twenty degrees
+      off, the brightness is changing twenty times faster. So instead of hunting for "darkest":
+      <br><br>1. Turn well past the dark point until the reflection is clearly coming back — note that
+      position as <b>A</b>.
+      <br>2. Turn back the other way until it looks <b>equally bright</b> — that is <b>B</b>.
+      <br>3. The true minimum is exactly halfway between. Enter both and the app halves them.
+      <br><br>Simulated, this is about <b>4× more accurate</b> than judging the darkest point directly
+      (median 1.2° against 4.7°).</div>
+    <div class="grid2" style="margin-top:10px">
+      <div><label>A — one side (°)</label><input id="inBrA" type="number" step="0.5" placeholder="e.g. 140"></div>
+      <div><label>B — other side (°)</label><input id="inBrB" type="number" step="0.5" placeholder="e.g. 190"></div>
+    </div>
+    <button id="btnBracket" style="width:100%;margin-top:8px">Use the midpoint of A and B</button>
+    <div class="tiny dim" style="margin-top:6px" id="brMsg">Or drag the dial below to the darkest
+      point directly, if you prefer.</div>
     <div style="margin:10px 0">
       <svg id="calRing" viewBox="-320 -320 640 640"></svg>
     </div>
@@ -204,7 +270,14 @@ hr{border:0;border-top:1px solid var(--line);margin:12px 0}
   </div>
 
   <div class="card">
-    <h1>Step 2 · Handedness (indoors, no sun, any hour)</h1>
+    <h1>Step 2 · Handedness — usually skippable</h1>
+    <div class="note"><b>The sign is forced by the geometry.</b> Given the ring drawing matches your
+    filter, +1 is the only possibility: the end-to-end simulation puts it on the true intensity minimum
+    at 100.0000%, while the mirrored version manages 54.6%.
+    <br><br><b>The five-second check that actually matters:</b> compare the ring drawing on the Aim tab
+    with your filter. Does the engraving run the same way round on both — “46” near the top, then KSM,
+    then MASTER, then B+W MADE IN GERMANY going clockwise? If yes, handedness is right; leave this alone.
+    <br><br>The screen test below is belt-and-braces if you want it.</div>
     <div class="note">Nearly every LCD and OLED emits linearly polarised light through a bonded
       polariser, so the polarisation <b>turns with the device</b>. A few screens add a retarder film on
       top so they do not black out through polarised sunglasses; on those there is no clear minimum and
@@ -265,7 +338,7 @@ hr{border:0;border-top:1px solid var(--line);margin:12px 0}
   </div>
 
   <div class="card">
-    <h1>Compass truth check (GPS) — the only absolute test</h1>
+    <h1>Compass truth check (GPS) — only needed in compass mode</h1>
     <div class="note">Chrome on Android reports headings from Android's rotation-vector sensor, which is
       referenced to <b>magnetic</b> north — so the app applies the declination above. Some Android
       layers hand back true north already, in which case it should not. This is a property of your
@@ -338,7 +411,7 @@ hr{border:0;border-top:1px solid var(--line);margin:12px 0}
   </div>
 
   <div class="card">
-    <h1>Optional · Camera interference check</h1>
+    <h1>Optional · Camera interference check <span class="tiny dim">(compass mode only)</span></h1>
     <div class="note">Camera iron does <b>not</b> produce a constant offset; it produces an error that
       swings through zero as you turn, so it cannot be calibrated away with a single number — it has to
       be avoided by keeping the M away from the phone while you take the reading. This measures how
@@ -451,45 +524,77 @@ hr{border:0;border-top:1px solid var(--line);margin:12px 0}
 
 <!-- ══════════════════ DEBUG ══════════════════ -->
 <div id="paneDbg" class="hide">
+
   <div class="card">
-    <h1>Capture a reading for diagnosis</h1>
-    <div class="note">This records the <b>raw sensor input</b> — not just the app's answer — so the whole
-      calculation can be re-run independently and compared. Without that, a wrong reading cannot be told
-      apart from a wrong compass.
-      <br><br><b>The one thing the app cannot know is what you actually saw.</b> Fill that in and the
-      cause becomes identifiable: a constant error means the filter calibration, an error of twice the
-      filter angle means handedness, an error that changes with direction means the compass.</div>
-    <ol class="steps">
-      <li>Take a reading as normal and tap <b>Hold reading</b>. That freezes a full snapshot.</li>
-      <li>Find the <b>true darkest</b> position by turning the filter and looking through it.</li>
-      <li>Enter that ring position below, add a note, then Download or Copy.</li>
-    </ol>
-    <div class="kv"><span class="dim">Snapshot</span><span id="dbgState" class="pill">none held</span></div>
-    <label style="margin-top:8px">Ring position that was actually darkest (° — or leave blank)</label>
-    <input id="dbgObs" type="number" step="0.5" placeholder="e.g. 5.3">
-    <label style="margin-top:8px">What happened, in your words</label>
-    <input id="dbgNote" type="text" placeholder="street level, facing the park, app said X, truth was Y">
+    <h1>Field logbook</h1>
+    <div class="note">Every time you tap <b>Hold reading</b> a row is added here with the full sensor
+      snapshot. Pick the row, choose the marking that was <b>actually darkest</b>, and save. Build up
+      20–30 rows across different directions, times of day, days and places, then export the file.
+      <br><br>The log <b>survives closing the app</b>, so a study can run over several days.</div>
+    <div class="kv"><span class="dim">Rows</span><b id="logCount" class="mono">0</b></div>
+    <div class="kv"><span class="dim">With a truth value</span><b id="logDone" class="mono">0</b></div>
+    <div class="kv"><span class="dim">Days covered</span><b id="logDays" class="mono">—</b></div>
+    <div class="kv"><span class="dim">Directions covered</span><b id="logDirs" class="mono">—</b></div>
     <div class="row" style="margin-top:10px">
-      <button id="btnDbgSave" class="pri grow">Download file</button>
-      <button id="btnDbgCopy" class="grow">Copy</button>
+      <button id="btnDbgSave" class="pri grow">Export file</button>
+      <button id="btnDbgCopy" class="grow">Copy summary</button>
     </div>
     <div class="row" style="margin-top:8px">
       <button id="btnDbgShare" class="grow sm">Share…</button>
-      <button id="btnDbgClear" class="sm">Clear log</button>
+      <button id="btnDbgClear" class="sm hot">Clear log</button>
     </div>
-    <div class="tiny" style="margin-top:8px;color:var(--warn)">The file includes your GPS position to
-      about a metre and your device/browser identity. Nothing leaves the phone unless you send it.</div>
-    <div class="tiny dim" style="margin-top:8px" id="dbgMsg">The file lands in your Downloads folder —
-      attach it to the conversation. Copy puts a shorter summary on the clipboard if you would rather
-      paste it.</div>
+    <div class="tiny" style="margin-top:8px;color:var(--warn)">The file includes your GPS positions to
+      about a metre and your device identity. Nothing leaves the phone unless you send it.</div>
+    <div class="tiny dim" style="margin-top:6px" id="dbgMsg">Export lands in your Downloads folder.</div>
+  </div>
+
+  <div class="card" id="entryCard">
+    <h1>Fill in the selected row</h1>
+    <div class="kv"><span class="dim">Row</span><b id="selRow" class="mono">none selected</b></div>
+    <div class="kv"><span class="dim">When</span><b id="selWhen" class="mono">—</b></div>
+    <div class="kv"><span class="dim">App said</span><b id="selSaid" class="mono">—</b></div>
+    <div class="kv"><span class="dim">Facing</span><b id="selFacing" class="mono">—</b></div>
+
+    <label style="margin-top:10px">Marking that was actually darkest at the top</label>
+    <select id="selGlyph"></select>
+    <div class="grid2" style="margin-top:8px">
+      <div>
+        <label>Nudge (°, optional)</label>
+        <input id="selNudge" type="number" step="1" value="0" placeholder="0">
+      </div>
+      <div>
+        <label>Confidence</label>
+        <select id="selConf">
+          <option value="sharp">Sharp minimum</option>
+          <option value="ok">Reasonably clear</option>
+          <option value="broad">Broad / hard to place</option>
+        </select>
+      </div>
+    </div>
+    <div class="tiny dim" style="margin-top:4px">Use Nudge if the darkest point sat between two letters —
+      positive goes toward MASTER, negative back toward “46”. Either 180° twin is fine.</div>
+    <label style="margin-top:8px">Note (subject, sky, anything odd)</label>
+    <input id="selNote" type="text" placeholder="e.g. facing the park, thin cloud">
+    <div class="row" style="margin-top:10px">
+      <button id="btnRowSave" class="pri grow">Save row</button>
+      <button id="btnRowClear">Clear truth</button>
+    </div>
+    <div class="tiny dim" style="margin-top:6px" id="rowMsg"></div>
+  </div>
+
+  <div class="card">
+    <h1>Readings</h1>
+    <div class="tiny dim">Tap a row to select it.</div>
+    <div style="overflow-x:auto;margin-top:8px">
+      <table id="logTable" style="width:100%;border-collapse:collapse;font-size:12px"></table>
+    </div>
   </div>
 
   <div class="card">
     <h1>Field accuracy — the test that actually matters</h1>
     <div class="note">Every other check in this app compares the app against its own model. This one
-      compares it against the sky. Take 20–30 readings across different headings and sun angles,
-      attaching the true darkest position each time, and the spread below <b>is</b> the app's accuracy.
-      Under about ±8° and it works; wider, and the shape of the distribution says why.</div>
+      compares it against the sky. Under about ±8° median and it works; wider, and the shape of the
+      distribution says why.</div>
     <div class="kv"><span class="dim">Readings with a truth value</span><b id="accN" class="mono">0</b></div>
     <div class="kv"><span class="dim">Median error</span><b id="accMed" class="mono">—</b></div>
     <div class="kv"><span class="dim">Spread (10th–90th)</span><b id="accSpread" class="mono">—</b></div>
@@ -500,20 +605,9 @@ hr{border:0;border-top:1px solid var(--line);margin:12px 0}
   </div>
 
   <div class="card">
-    <h1>Reading log</h1>
-    <div class="tiny dim">The last 20 held readings are kept. Pick one and attach the ring position that
-      was truly darkest, so a session builds the histogram above.</div>
-    <div class="row" style="margin-top:8px">
-      <select id="dbgPick" class="grow"></select>
-      <input id="dbgPickObs" type="number" step="0.5" placeholder="true °" style="max-width:104px">
-      <button id="btnDbgAttach" class="pri sm">Attach</button>
-    </div>
-    <div id="dbgLog" class="tiny mono" style="margin-top:8px;white-space:pre-wrap;line-height:1.5"></div>
-  </div>
-
-  <div class="card">
     <h1>Live snapshot preview</h1>
-    <div class="tiny mono" id="dbgPreview" style="white-space:pre-wrap;word-break:break-all;line-height:1.45;max-height:340px;overflow:auto"></div>
+    <div class="kv"><span class="dim">Current state</span><span id="dbgState" class="pill">—</span></div>
+    <div class="tiny mono" id="dbgPreview" style="white-space:pre-wrap;word-break:break-all;line-height:1.45;max-height:300px;overflow:auto;margin-top:8px"></div>
   </div>
 </div>
 
@@ -523,7 +617,7 @@ hr{border:0;border-top:1px solid var(--line);margin:12px 0}
 
 <script>
 "use strict";
-const APP_VERSION="v14";
+const APP_VERSION="v16";
 const D=Math.PI/180, R2D=180/Math.PI;
 const $=id=>document.getElementById(id);
 const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
@@ -759,7 +853,8 @@ const S={
   lat:null, lon:null, acc:null,
   az:null, el:null, roll:null, absOK:false, aimSpread:0, geoLive:false,
   frozen:false, frame:"level",
-  aimSrc:"sensor", manAz:0, manEl:0,
+  aimSrc:"sight", manAz:0, manEl:0, sight:null, sightRef:"sun", sightBearing:29,
+  relAz:null, relEl:null,
   calPsi:0, ringShown:0, heldSnap:null
 };
 function save(){
@@ -778,7 +873,7 @@ function declinationNow(){
   try{ return wmmField(S.lat,S.lon,0,decimalYear(new Date())); }catch(e){ return null; }
 }
 const PERSIST=["psiT","off","hand","handDone","hdPsi1","hdPsi2","hdTurn",
-  "northRef","walkDone","walkDiff","siteFix","walkOffset","frame"];
+  "northRef","walkDone","walkDiff","siteFix","walkOffset","frame","aimSrc","sightRef","sightBearing"];
 function load(){
   try{
     const o=JSON.parse(localStorage.getItem("pf")||"{}");
@@ -873,6 +968,20 @@ function describe(psiTop){
     sub:pct+"% of the way across — "+dA.toFixed(0)+"° past “"+A.c+"”, "+
         dB.toFixed(0)+"° short of “"+B.c+"”"
   };
+}
+
+/* ═══════════ aim by sighting ═══════════
+   One sighting of something whose true bearing is known turns the gyro's
+   arbitrary yaw origin into true azimuth:  trueAz = relAz + yawOffset.
+   No magnetometer, so no declination, no site anomalies, no 159 degree surprises. */
+const SIGHT_WARN=120000, SIGHT_STALE=600000;
+function sightAgeMs(){ return S.sight? nowMs()-S.sight.t : Infinity; }
+function sightOK(){ return !!S.sight && !S.sight.broken && sightAgeMs()<SIGHT_STALE; }
+function takeSight(trueBearing,label){
+  if(S.relAz===null||S.relAz===undefined) return false;
+  S.sight={yawOffset:mod(trueBearing-S.relAz,360), t:nowMs(), label:label,
+           bearing:+mod(trueBearing,360).toFixed(2), relAtSight:+S.relAz.toFixed(2), broken:false};
+  return true;
 }
 
 /* ═══════════ core solve ═══════════ */
@@ -1018,6 +1127,10 @@ function solve(){
   if(lat===null||lon===null) return null;
   let camAz, camEl;
   if(S.aimSrc==="manual"){ camAz=S.manAz; camEl=S.manEl; }
+  else if(S.aimSrc==="sight"){
+    if(!sightOK() || S.relAz===null||S.relAz===undefined) return null;
+    camAz=mod(S.relAz+S.sight.yawOffset,360); camEl=S.relEl;
+  }
   else { camAz=S.az; camEl=S.el; }
   if(camAz===null||camAz===undefined||lat===null) return null;
 
@@ -1089,9 +1202,16 @@ function paint(R){
      (geoAge()===Infinity? " (typed)" : geoAge()>GEO_STALE? "  ⚠ "+(geoAge()/60000).toFixed(0)+" min old"
         : "  ·  "+(geoAge()/1000).toFixed(0)+"s ago");
   if(!R){
-    $("instr").textContent = S.lat===null? "Need a GPS fix" : "Need a compass reading";
-    $("instr2").textContent = S.lat===null? "Tap Use GPS in Calibrate, or type a location."
-                                          : "Tap Enable sensors.";
+    if(S.aimSrc==="sight" && !sightOK()){
+      $("instr").textContent = S.sight? "Sighting lost" : "Not sighted yet";
+      $("instr2").textContent = "Use Aim reference above: sight the sun, or a street bearing if a "+
+        "building is in the way.";
+    } else {
+      $("instr").textContent = S.lat===null? "Need a GPS fix" : "Need a sensor reading";
+      $("instr2").textContent = S.lat===null? "Tap Use GPS in Calibrate, or type a location."
+                                            : "Tap Enable sensors.";
+    }
+    sightPaint();
     $("instr3").textContent="";
     drawRing($("ring"), S.ringShown); $("ring").setAttribute("opacity","0.25");
     return;
@@ -1159,6 +1279,7 @@ function paint(R){
   drawRing($("ring"), R.psiTop); $("ring").setAttribute("opacity","1");
   steadiness(R);
   magPaint(R);
+  sightPaint();
 }
 
 /* live magnetic-environment verdict, in units that matter: degrees of ring
@@ -1269,6 +1390,8 @@ function noteRaw(e,isAbs){
   if(RAW.length>RAWMAX) RAW.splice(0,RAW.length-RAWMAX);
 }
 const DBGLOG=[];
+const LOGKEY="pf_log";
+
 function buildSnapshot(tag){
   try{
     const R=lastSolve, wf=declinationNow(), so=siteOffset(), fc=fieldConsistency(), mg=magnetics();
@@ -1313,6 +1436,7 @@ function buildSnapshot(tag){
   }catch(err){ return {schema:"polarfinder-debug/2", error:String(err&&err.stack||err),
                        capturedISO:new Date().toISOString()}; }
 }
+
 function enrich(s){
   if(!s || !s.solved || !s.observed || s.observed.darkestRingDeg===null) return s;
   let dr=Math.abs(mod(s.observed.darkestRingDeg-s.solved.psiTopShown,180));
@@ -1335,55 +1459,19 @@ function enrich(s){
   }catch(e){ s.observed.inversionError=String(e); }
   return s;
 }
-function currentSnapshot(){
-  const s=(S.frozen && S.heldSnap) ? JSON.parse(JSON.stringify(S.heldSnap)) : buildSnapshot("live");
-  const o=parseFloat($("dbgObs").value);
-  s.observed={ darkestRingDeg: isFinite(o)? o : null, note: $("dbgNote").value || null };
-  return enrich(s);
-}
+
 function dbgFilename(){
   const t=new Date(), p=n=>String(n).padStart(2,"0");
   return "polarfinder-"+t.getFullYear()+p(t.getMonth()+1)+p(t.getDate())+"-"+
          p(t.getHours())+p(t.getMinutes())+p(t.getSeconds())+".json";
 }
-function dbgPayload(){
-  return JSON.stringify({schema:"polarfinder-debug/2", appVersion:APP_VERSION,
-    exportedISO:new Date().toISOString(), current:currentSnapshot(),
-    log:DBGLOG.map(e=>enrich(JSON.parse(JSON.stringify(e))))}, null, 1);
-}
-function dbgSummary(){
-  const s=currentSnapshot();
-  if(s.error) return "PolarFinder debug: snapshot failed — "+s.error;
-  const L=[];
-  L.push("PolarFinder "+s.appVersion+"  "+s.capturedISO+"  ("+s.tag+")");
-  L.push("cal: psiT="+s.calibration.psiT+" hand="+s.calibration.hand+" northRef="+s.calibration.northRef+
-         " trim="+s.calibration.manualTrim+" frame="+s.calibration.frame+" aimSrc="+s.calibration.aimSrc);
-  L.push("site: "+JSON.stringify(s.siteCorrection)+"  fix="+JSON.stringify(s.calibration.siteFix));
-  L.push("pos: "+JSON.stringify(s.position)+"  geoAge="+s.sensors.geoAgeMs+"ms orientAge="+s.sensors.orientAgeMs+"ms");
-  L.push("rawAim: az="+s.rawAim.az+" el="+s.rawAim.el+" spread="+s.sensors.aimSpreadDeg+
-         "  sawAbsolute="+s.sensors.sawAbsolute);
-  L.push("decl: "+JSON.stringify(s.declination));
-  if(s.solved) L.push("solved: sun "+s.solved.sunAz+"/"+s.solved.sunAlt+"  cam "+s.solved.camAzUsed+"/"+
-    s.solved.camEl+"  gamma "+s.solved.gamma+"  theta "+s.solved.thetaImagePlane+"  amp "+
-    s.solved.amplification+"  P "+s.solved.P+"  ring "+s.solved.psiTopShown);
-  if(s.solved) L.push("shown: "+s.solved.instruction+" | "+s.solved.detail);
-  L.push("magCheck(phone-carried iron only): "+JSON.stringify(s.magneticCheck));
-  L.push("observed: "+JSON.stringify(s.observed));
-  const acc=accStats();
-  if(acc) L.push("field accuracy over "+acc.n+" readings: median "+acc.med.toFixed(1)+
-    "  p10-p90 "+acc.p10.toFixed(1)+"-"+acc.p90.toFixed(1)+"  mean signed "+acc.mean.toFixed(1)+
-    "  sd "+acc.sd.toFixed(1));
-  L.push("rawEvents="+s.rawOrientationEvents.length+" fusion="+s.fusionSamples.length+
-         "  (download the JSON for those)");
-  return L.join("\n");
-}
 
-/* ── field accuracy: the app against the sky, not against its own model ── */
 function logErr(e){
   if(!e || !e.solved || !e.observed || e.observed.darkestRingDeg==null) return null;
   let x=Math.abs(mod(e.observed.darkestRingDeg-e.solved.psiTopShown,180));
   return Math.min(x,180-x);
 }
+
 function accStats(){
   const rows=DBGLOG.map(e=>({e,err:logErr(e)})).filter(r=>r.err!==null);
   if(!rows.length) return null;
@@ -1395,6 +1483,7 @@ function accStats(){
   const sd=Math.sqrt(signed.reduce((a,b)=>a+(b-mean)*(b-mean),0)/Math.max(1,signed.length-1));
   return {n:rows.length, errs, med:q(0.5), p10:q(0.1), p90:q(0.9), mean, sd};
 }
+
 function accRefresh(){
   const a=accStats();
   $("accN").textContent=a?a.n:0;
@@ -1431,74 +1520,223 @@ function accRefresh(){
       "check Facing against a direction you know.";
   }
 }
+
+/* ── the log must survive closing the app: a study runs over days ──
+   Raw events are the bulky part, so they are trimmed for storage while the
+   fields the analysis needs are kept whole. If the quota is still hit, raw
+   data is dropped entirely rather than losing the log. */
+function trimForStorage(e,rawKeep){
+  const c=JSON.parse(JSON.stringify(e));
+  if(c.rawOrientationEvents) c.rawOrientationEvents=c.rawOrientationEvents.slice(-rawKeep);
+  if(c.fusionSamples) c.fusionSamples=c.fusionSamples.slice(-Math.min(60,rawKeep));
+  return c;
+}
+function saveLog(){
+  for(const keep of [80,20,0]){
+    try{
+      localStorage.setItem(LOGKEY, JSON.stringify({v:1, rows:DBGLOG.map(e=>trimForStorage(e,keep))}));
+      return true;
+    }catch(err){ /* quota — try again with less */ }
+  }
+  try{ localStorage.setItem(LOGKEY, JSON.stringify({v:1, rows:DBGLOG.map(e=>{
+        const c=trimForStorage(e,0); delete c.rawOrientationEvents; delete c.fusionSamples; return c; })}));
+  }catch(err){ return false; }
+  return true;
+}
+function loadLog(){
+  try{
+    const o=JSON.parse(localStorage.getItem(LOGKEY)||"null");
+    if(o && Array.isArray(o.rows)){ DBGLOG.length=0; for(const r of o.rows) DBGLOG.push(r); }
+  }catch(e){}
+}
+
+/* ── entering the truth as a MARKING rather than a number ── */
+const GLYPH_OPTS=[...GLYPHS].sort((a,b)=>a.psi-b.psi);
+function glyphLabel(g){ return "“"+g.c+"” of "+g.tok+"   ("+g.psi.toFixed(0)+"°)"; }
+function fillGlyphSelect(){
+  const sel=$("selGlyph");
+  sel.innerHTML='<option value="">— pick the marking at the top —</option>'+
+    GLYPH_OPTS.map((g,i)=>'<option value="'+i+'">'+glyphLabel(g)+'</option>').join("");
+}
+let selIdx=null;   // which log row is being edited
+
+function rowTruthDeg(e){
+  return (e.observed && e.observed.darkestRingDeg!=null)? e.observed.darkestRingDeg : null;
+}
+function rowLabel(deg){
+  if(deg==null) return "—";
+  const dd=describe(deg);
+  return dd.main.replace(/\s+/g," ");
+}
+function selectRow(i){
+  selIdx=i;
+  const e=DBGLOG[i];
+  if(!e){ $("selRow").textContent="none selected"; return; }
+  $("selRow").textContent="#"+(i+1)+" of "+DBGLOG.length;
+  const dt=new Date(e.capturedISO);
+  $("selWhen").textContent=dt.toLocaleDateString([], {year:"numeric",month:"short",day:"numeric"})+
+    "  "+dt.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"});
+  $("selSaid").textContent=e.solved? rowLabel(e.solved.psiTopShown)+"  ("+e.solved.psiTopShown.toFixed(1)+"°)" : "—";
+  $("selFacing").textContent=e.solved? CARD16(e.solved.camAzUsed)+" "+e.solved.camAzUsed.toFixed(0)+"°"+
+    (e.solved.camEl>8?" ↑":e.solved.camEl<-8?" ↓":"") : "—";
+  const t=rowTruthDeg(e);
+  if(t!=null){
+    let best=0,bd=1e9;
+    GLYPH_OPTS.forEach((g,k)=>{ let x=Math.abs(mod(g.psi-t,360)); x=Math.min(x,360-x);
+      if(x<bd){bd=x;best=k;} });
+    $("selGlyph").value=String(best);
+    $("selNudge").value=(mod(t-GLYPH_OPTS[best].psi+180,360)-180).toFixed(0);
+  } else { $("selGlyph").value=""; $("selNudge").value="0"; }
+  $("selConf").value=(e.observed&&e.observed.confidence)||"ok";
+  $("selNote").value=(e.observed&&e.observed.note)||"";
+  $("rowMsg").textContent="";
+  dbgRefresh();
+}
+function CARD16(az){
+  const C=["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"];
+  return C[Math.round(mod(az,360)/22.5)%16];
+}
+
+function renderTable(){
+  const t=$("logTable");
+  if(!DBGLOG.length){ t.innerHTML='<tr><td class="dim">No readings yet — tap Hold reading on the Aim tab.</td></tr>'; return; }
+  const hdr='<tr style="text-align:left;color:var(--dim)">'+
+    ["#","Date","Time","Facing","App said","Truth","Err"].map(x=>'<th style="padding:4px 6px;border-bottom:1px solid var(--line);white-space:nowrap">'+x+'</th>').join("")+'</tr>';
+  const rows=DBGLOG.map((e,i)=>{
+    const dt=new Date(e.capturedISO), err=logErr(e), t2=rowTruthDeg(e);
+    const sel=(i===selIdx);
+    const cells=[
+      (i+1),
+      dt.toLocaleDateString([], {month:"short",day:"numeric"}),
+      dt.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}),
+      e.solved? CARD16(e.solved.camAzUsed)+" "+e.solved.camAzUsed.toFixed(0)+"°" : "—",
+      e.solved? rowLabel(e.solved.psiTopShown) : "—",
+      t2!=null? rowLabel(t2) : '<span style="color:var(--warn)">needed</span>',
+      err!=null? err.toFixed(0)+"°" : "—"
+    ];
+    return '<tr data-i="'+i+'" style="cursor:pointer;'+(sel?"background:#1f2a36;":"")+'">'+
+      cells.map((c,k)=>'<td style="padding:5px 6px;border-bottom:1px solid #1b2027;'+
+        (k>=4?"":"white-space:nowrap;")+'">'+c+'</td>').join("")+'</tr>';
+  }).join("");
+  t.innerHTML=hdr+rows;
+  [...t.querySelectorAll("tr[data-i]")].forEach(tr=>{
+    tr.onclick=()=>selectRow(+tr.getAttribute("data-i"));
+  });
+}
+
+function logStats(){
+  const days=new Set(DBGLOG.map(e=>e.capturedISO.slice(0,10)));
+  const dirs=new Set(DBGLOG.filter(e=>e.solved).map(e=>Math.round(mod(e.solved.camAzUsed,360)/45)%8));
+  return {days:days.size, dirs:dirs.size,
+          done:DBGLOG.filter(e=>rowTruthDeg(e)!=null).length};
+}
+
+function dbgPayload(){
+  return JSON.stringify({schema:"polarfinder-debug/3", appVersion:APP_VERSION,
+    exportedISO:new Date().toISOString(),
+    exportedLocal:new Date().toString(),
+    summary:(function(){const a=accStats(),g=logStats();
+      return {rows:DBGLOG.length, withTruth:g.done, days:g.days, octantsCovered:g.dirs,
+              medianErrDeg:a?+a.med.toFixed(2):null, p10:a?+a.p10.toFixed(2):null,
+              p90:a?+a.p90.toFixed(2):null, meanSignedDeg:a?+a.mean.toFixed(2):null,
+              sdDeg:a?+a.sd.toFixed(2):null};})(),
+    current:currentSnapshot(),
+    log:DBGLOG.map(e=>enrich(JSON.parse(JSON.stringify(e))))}, null, 1);
+}
+function currentSnapshot(){
+  const s=(S.frozen && S.heldSnap) ? JSON.parse(JSON.stringify(S.heldSnap)) : buildSnapshot("live");
+  return enrich(s);
+}
+function dbgSummary(){
+  const a=accStats(), g=logStats();
+  const L=["PolarFinder "+APP_VERSION+" field log — "+new Date().toISOString()];
+  L.push("rows "+DBGLOG.length+", with truth "+g.done+", days "+g.days+", octants "+g.dirs);
+  if(a) L.push("median error "+a.med.toFixed(1)+"°, p10-p90 "+a.p10.toFixed(1)+"–"+a.p90.toFixed(1)+
+               "°, mean signed "+a.mean.toFixed(1)+"°, sd "+a.sd.toFixed(1)+"°");
+  L.push("");
+  L.push("#  date       time   facing      app said                 truth                    err");
+  DBGLOG.forEach((e,i)=>{
+    const dt=new Date(e.capturedISO), err=logErr(e), t2=rowTruthDeg(e);
+    L.push(String(i+1).padEnd(3)+dt.toISOString().slice(0,10)+" "+
+      dt.toTimeString().slice(0,5)+"  "+
+      (e.solved? (CARD16(e.solved.camAzUsed)+" "+e.solved.camAzUsed.toFixed(0)+"°").padEnd(11):"—".padEnd(11))+
+      (e.solved? rowLabel(e.solved.psiTopShown).slice(0,24).padEnd(25):"—".padEnd(25))+
+      (t2!=null? rowLabel(t2).slice(0,24).padEnd(25):"(none)".padEnd(25))+
+      (err!=null? err.toFixed(0)+"°":"—"));
+  });
+  return L.join("\n");
+}
+
 function dbgRefresh(){
   const held=S.frozen && S.heldSnap;
   $("dbgState").textContent = held? "held "+new Date(S.heldSnap.capturedISO).toLocaleTimeString()
                                   : "live (not held)";
   $("dbgState").className="pill "+(held?"ok":"warn");
-  $("dbgPreview").textContent=dbgSummary();
-  const sel=$("dbgPick");
-  if(sel){
-    const keep=sel.value;
-    sel.innerHTML=DBGLOG.map((e,i)=>{
-      const err=logErr(e);
-      return '<option value="'+i+'">'+(i+1)+". "+new Date(e.capturedISO).toLocaleTimeString()+
-        "  ring "+(e.solved? e.solved.psiTopShown.toFixed(1):"—")+
-        (err!==null? "  (err "+err.toFixed(1)+"°)" : "  (no truth)")+"</option>";
-    }).join("");
-    if(keep!=="" && +keep<DBGLOG.length) sel.value=keep;
-  }
+  const g=logStats();
+  $("logCount").textContent=DBGLOG.length;
+  $("logDone").textContent=g.done;
+  $("logDays").textContent=g.days||"—";
+  $("logDirs").textContent=g.dirs? g.dirs+" of 8" : "—";
+  renderTable();
   accRefresh();
-  $("dbgLog").textContent = DBGLOG.length
-    ? DBGLOG.map((e,i)=>{ const err=logErr(e);
-        return (i+1)+". "+new Date(e.capturedISO).toLocaleTimeString()+
-          "  ring "+(e.solved?e.solved.psiTopShown.toFixed(1):"—")+
-          "  cam "+(e.solved?e.solved.camAzUsed.toFixed(1):"—")+
-          "  γ "+(e.solved?e.solved.gamma.toFixed(1):"—")+
-          (err!==null? "  truth "+e.observed.darkestRingDeg.toFixed(1)+" → err "+err.toFixed(1)+"°" : "");
-      }).join("\n")
-    : "(no held readings yet)";
+  try{ $("dbgPreview").textContent=dbgSummary(); }catch(e){ $("dbgPreview").textContent="preview error: "+e; }
 }
+
 function dbgDownload(){
   try{
     const blob=new Blob([dbgPayload()],{type:"application/json"});
     const url=URL.createObjectURL(blob), a=document.createElement("a");
     a.href=url; a.download=dbgFilename(); document.body.appendChild(a); a.click();
     setTimeout(()=>{URL.revokeObjectURL(url); a.remove();},1000);
-    $("dbgMsg").textContent="Saved "+dbgFilename()+" to Downloads. Attach it to the conversation.";
-  }catch(e){ $("dbgMsg").textContent="Download failed ("+e+"). Try Copy instead."; }
+    $("dbgMsg").textContent="Saved "+dbgFilename()+" — "+DBGLOG.length+" rows, "+g0()+" with a truth value.";
+  }catch(e){ $("dbgMsg").textContent="Export failed ("+e+"). Try Copy summary instead."; }
 }
+function g0(){ return logStats().done; }
+
 $("btnDbgSave").onclick=dbgDownload;
 $("btnDbgCopy").onclick=async()=>{
   const txt=dbgSummary();
-  try{ await navigator.clipboard.writeText(txt);
-       $("dbgMsg").textContent="Summary copied — paste it into the conversation."; }
+  try{ await navigator.clipboard.writeText(txt); $("dbgMsg").textContent="Table copied to the clipboard."; }
   catch(e){
     const ta=document.createElement("textarea"); ta.value=txt; document.body.appendChild(ta);
     ta.select(); try{document.execCommand("copy");}catch(_){}
-    ta.remove(); $("dbgMsg").textContent="Summary copied (fallback).";
+    ta.remove(); $("dbgMsg").textContent="Table copied (fallback).";
   }
 };
 $("btnDbgShare").onclick=async()=>{
   try{
     const file=new File([dbgPayload()],dbgFilename(),{type:"application/json"});
     if(navigator.canShare && navigator.canShare({files:[file]}))
-      await navigator.share({files:[file],title:"PolarFinder debug"});
-    else await navigator.share({title:"PolarFinder debug", text:dbgSummary()});
+      await navigator.share({files:[file],title:"PolarFinder field log"});
+    else await navigator.share({title:"PolarFinder field log", text:dbgSummary()});
     $("dbgMsg").textContent="Shared.";
-  }catch(e){ $("dbgMsg").textContent="Share unavailable here — use Download."; }
+  }catch(e){ $("dbgMsg").textContent="Share unavailable here — use Export."; }
 };
-$("btnDbgClear").onclick=()=>{ DBGLOG.length=0; dbgRefresh(); $("dbgMsg").textContent="Log cleared."; };
-$("dbgObs").oninput=dbgRefresh; $("dbgNote").oninput=dbgRefresh;
-$("btnDbgAttach").onclick=()=>{
-  const i=parseInt($("dbgPick").value,10), v=parseFloat($("dbgPickObs").value);
-  if(isNaN(i)||!DBGLOG[i]){alert("Pick a reading from the list first.");return;}
-  if(!isFinite(v)){alert("Enter the ring position that was actually darkest.");return;}
-  DBGLOG[i].observed=DBGLOG[i].observed||{};
-  DBGLOG[i].observed.darkestRingDeg=mod(v,360);
-  $("dbgPickObs").value=""; dbgRefresh();
-  $("dbgMsg").textContent="Attached "+mod(v,360).toFixed(1)+"° to reading "+(i+1)+
-    " — error "+logErr(DBGLOG[i]).toFixed(1)+"°.";
+$("btnDbgClear").onclick=()=>{
+  if(!confirm("Delete all "+DBGLOG.length+" logged readings? This cannot be undone."))return;
+  DBGLOG.length=0; selIdx=null; saveLog(); dbgRefresh(); $("dbgMsg").textContent="Log cleared.";
+};
+$("btnRowSave").onclick=()=>{
+  if(selIdx==null||!DBGLOG[selIdx]){alert("Tap a row in the table first.");return;}
+  const gi=$("selGlyph").value;
+  const e=DBGLOG[selIdx];
+  e.observed=e.observed||{};
+  if(gi===""){ $("rowMsg").textContent="Pick a marking, or use Clear truth."; return; }
+  const nud=parseFloat($("selNudge").value); 
+  const deg=mod(GLYPH_OPTS[+gi].psi + (isFinite(nud)?nud:0), 360);
+  e.observed.darkestRingDeg=deg;
+  e.observed.confidence=$("selConf").value;
+  e.observed.note=$("selNote").value||null;
+  enrich(e);
+  saveLog(); dbgRefresh();
+  const err=logErr(e);
+  $("rowMsg").textContent="Row "+(selIdx+1)+" saved — truth "+deg.toFixed(1)+"°, error "+
+    (err!=null?err.toFixed(1)+"°":"—")+".";
+};
+$("btnRowClear").onclick=()=>{
+  if(selIdx==null||!DBGLOG[selIdx])return;
+  DBGLOG[selIdx].observed={darkestRingDeg:null,note:null};
+  saveLog(); selectRow(selIdx); $("rowMsg").textContent="Truth cleared for row "+(selIdx+1)+".";
 };
 
 /* ═══════════ sensors ═══════════ */
@@ -1526,7 +1764,7 @@ const OWIN=1000;                    // ms of history to average over
 
 function handleOrient(e,isAbs){
   if(e.alpha===null||e.alpha===undefined) return;
-  noteRaw(e,isAbs);
+  if(isAbs) noteRaw(e,true);          // relative events are logged by noteRelative
   if(isAbs) sawAbsolute=true;
   lastOrientT=nowMs();
   const M=orientMatrix(e.alpha,e.beta,e.gamma);
@@ -1550,8 +1788,13 @@ function handleOrient(e,isAbs){
 function onOrientAbs(e){ handleOrient(e,true); }
 function onOrientAny(e){
   const isAbs = e.absolute===true || typeof e.webkitCompassHeading==="number";
-  if(sawAbsolute && !isAbs){ noteRelative(e); return; }  // never steers the aim…
-  handleOrient(e,isAbs);                                  // …but it is not wasted
+  /* The gyro stream must ALWAYS be processed — it is what sighting mode runs on.
+     An earlier version only fed it when an absolute event had already been seen,
+     so on a phone reporting only relative orientation the sight could never be
+     taken at all. */
+  if(!isAbs) noteRelative(e);
+  if(sawAbsolute && !isAbs) return;      // relative data never steers the compass aim
+  handleOrient(e,isAbs);
 }
 
 /* ── magnetic disturbance WITHOUT the Magnetometer API ────────────────────
@@ -1574,9 +1817,25 @@ function headingOf(e){
   const v=scl(M.z,-1);
   return mod(Math.atan2(v[0],v[1])*R2D,360);
 }
+/* The gyro stream. Gravity is exact; only its yaw origin is arbitrary, and one
+   sighting pins that down. Iron cannot touch any of it. */
+const RBUF2=[];
+let lastRelT=0;
 function noteRelative(e){
   if(e.alpha===null||e.alpha===undefined) return;
   noteRaw(e,false);
+  const M2=orientMatrix(e.alpha,e.beta,e.gamma);
+  const v2=scl(M2.z,-1);
+  const now2=nowMs();
+  if(lastRelT && now2-lastRelT>1500 && S.sight) S.sight.broken=true;   // sensor restarted
+  lastRelT=now2;
+  RBUF2.push({t:now2,v:v2});
+  while(RBUF2.length && now2-RBUF2[0].t>OWIN) RBUF2.shift();
+  let m2=[0,0,0];
+  for(const b of RBUF2) m2=[m2[0]+b.v[0],m2[1]+b.v[1],m2[2]+b.v[2]];
+  m2=norm(m2);
+  S.relAz=mod(Math.atan2(m2[0],m2[1])*R2D,360);
+  S.relEl=Math.asin(clamp(m2[2],-1,1))*R2D;
   const now=(typeof performance!=="undefined"&&performance.now)?performance.now():Date.now();
   FUSE.rel={t:now,h:headingOf(e)};
   pairFuse(now);
@@ -1721,7 +1980,6 @@ async function startSensors(){
   }catch(e){}
   attachOrientation();
   getGeo();
-  startMagnetometer();
   try{ if("wakeLock" in navigator) wakeLock=await navigator.wakeLock.request("screen"); }catch(e){}
   setTimeout(()=>{
     if(S.az===null){
@@ -1755,7 +2013,6 @@ async function onResume(){
   flushSensorHistory();
   attachOrientation();
   getGeo(true);
-  startMagnetometer();
   if(S.frozen){                   // never let a held reading survive a journey
     S.frozen=false; S.heldSnap=null;
     $("btnFreeze").textContent="Hold reading";
@@ -1813,7 +2070,7 @@ function tab(n){
     $(p).classList.toggle("hide",!act);
   }
   if(n==="Cal"){ drawCal(); drawHd(); handPaint(); }
-  if(n==="Dbg") dbgRefresh();
+  if(n==="Dbg"){ dbgRefresh(); if(selIdx!==null) selectRow(selIdx); }
 }
 $("tabAim").onclick=()=>tab("Aim");
 $("tabCal").onclick=()=>tab("Cal");
@@ -1826,7 +2083,9 @@ $("btnFreeze").onclick=()=>{
   if(S.frozen){
     S.heldSnap=buildSnapshot("held");          // freeze the evidence with the reading
     DBGLOG.push(S.heldSnap);
-    while(DBGLOG.length>20) DBGLOG.shift();
+    while(DBGLOG.length>60) DBGLOG.shift();    // a multi-day study needs room
+    selIdx=DBGLOG.length-1;
+    saveLog();
   }
   $("btnFreeze").textContent=S.frozen?"Live again":"Hold reading";
   $("btnFreeze").classList.toggle("hot",S.frozen);
@@ -1834,10 +2093,83 @@ $("btnFreeze").onclick=()=>{
   dbgRefresh();
 };
 $("selFrame").onchange=e=>{S.frame=e.target.value;save();};
-$("selAim").onchange=e=>{S.aimSrc=e.target.value;$("manualBox").classList.toggle("hide",S.aimSrc!=="manual");};
+$("selAim").onchange=e=>{S.aimSrc=e.target.value;save();
+  $("manualBox").classList.toggle("hide",S.aimSrc!=="manual");
+  $("sightCard").classList.toggle("hide",S.aimSrc!=="sight"); render();};
+
+/* ── sighting ─────────────────────────────────────────────────────────── */
+function sightPaint(){
+  const p=$("sightPill"), st=$("sightState");
+  if(S.aimSrc!=="sight"){ return; }
+  if(!S.sight){ p.textContent="not sighted"; p.className="pill bad";
+    st.textContent="Sight the sun or a known bearing to start. Until then there is no aim."; return; }
+  if(S.sight.broken){ p.textContent="lost — re-sight"; p.className="pill bad";
+    st.textContent="The gyro restarted (the app was backgrounded), so the reference is gone. Sight again."; return; }
+  const age=sightAgeMs();
+  if(age>SIGHT_STALE){ p.textContent="expired"; p.className="pill bad";
+    st.textContent="Sighted "+(age/60000).toFixed(0)+" min ago — too long, gyro drift has accumulated. Sight again."; return; }
+  const mins=age/60000;
+  p.textContent=(mins<2?"good":"ageing")+" · "+(mins<1?(age/1000).toFixed(0)+"s":mins.toFixed(1)+" min");
+  p.className="pill "+(mins<2?"ok":"warn");
+  st.textContent="Sighted on "+S.sight.label+" ("+S.sight.bearing.toFixed(0)+"° true) "+
+    (mins<1?(age/1000).toFixed(0)+" seconds":mins.toFixed(1)+" minutes")+" ago."+
+    (mins>2?"  Drift is roughly a degree a minute — sight again for best accuracy.":"");
+}
+$("btnSightSun").onclick=()=>{
+  $("sunBox").classList.toggle("hide");
+  $("brgBox").classList.add("hide");
+  const az=(S.lat===null||S.lon===null)?null:sunPosition(new Date(),S.lat,S.lon);
+  $("sunHint").textContent = az? ("Right now the sun is at "+az.az.toFixed(0)+"° true, "+
+    az.alt.toFixed(0)+"° up."+(az.alt<3?"  It is too low or below the horizon — use a bearing instead.":"")) 
+    : "Waiting for a position fix — the sun's direction needs it.";
+};
+$("btnSightBrg").onclick=()=>{
+  $("brgBox").classList.toggle("hide");
+  $("sunBox").classList.add("hide");
+};
+$("selBrg").onchange=e=>{
+  $("brgCustom").classList.toggle("hide", e.target.value!=="custom");
+  if(e.target.value!=="custom") S.sightBearing=parseFloat(e.target.value);
+  save();
+};
+function sunSight(side){
+  if(S.lat===null||S.lon===null){alert("Need a position fix first — the sun's direction depends on it.");return;}
+  const sp=sunPosition(new Date(),S.lat,S.lon);
+  if(sp.alt<3){alert("The sun is too low or below the horizon. Use a bearing instead.");return;}
+  /* Phone edge-on to the sun: the sun lies 90 degrees to one side of where the
+     back is pointing. So the aim's true bearing is the sun's azimuth -/+ 90. */
+  const aimTrue=mod(sp.az + (side==="left"? 90 : -90), 360);
+  if(!takeSight(aimTrue,"the sun ("+(side==="left"?"on the left":"on the right")+")")){
+    alert("No gyro reading yet — tap Enable sensors and move the phone slightly.");return;}
+  save(); sightPaint(); render();
+  $("sunBox").classList.add("hide");
+};
+$("btnSunLeft").onclick=()=>sunSight("left");
+$("btnSunRight").onclick=()=>sunSight("right");
+$("btnBrgTake").onclick=()=>{
+  const v=$("selBrg").value;
+  const b=(v==="custom")? parseFloat($("inBrg").value) : parseFloat(v);
+  if(!isFinite(b)){alert("Enter the true bearing you are pointing along.");return;}
+  const lbl=(v==="custom")? "a bearing you entered" :
+    $("selBrg").options[$("selBrg").selectedIndex].textContent.split(" — ")[0];
+  if(!takeSight(b,lbl)){alert("No gyro reading yet — tap Enable sensors and move the phone slightly.");return;}
+  S.sightBearing=b; save(); sightPaint(); render();
+  $("brgBox").classList.add("hide");
+};
 $("inAz").oninput=e=>{S.manAz=numOr(e.target.value,-3600,3600,0);};
 $("inEl").oninput=e=>{S.manEl=numOr(e.target.value,-90,90,0);};
 
+$("btnBracket").onclick=()=>{
+  const a=parseFloat($("inBrA").value), b=parseFloat($("inBrB").value);
+  if(!isFinite(a)||!isFinite(b)){ $("brMsg").textContent="Enter both A and B."; return; }
+  /* Midpoint on a circle, taking the short way round, then folded into the
+     0-360 dial. Either 180-degree twin of each entry is acceptable. */
+  const d=mod(b-a+180,360)-180;
+  const mid=mod(a+d/2,360);
+  S.calPsi=mid; drawCal();
+  $("brMsg").textContent="Midpoint of "+a.toFixed(1)+"° and "+b.toFixed(1)+"° is "+mid.toFixed(1)+
+    "°. Check the dial, then Save.";
+};
 $("btnSavePsi").onclick=()=>{
   const v=parseFloat($("inPsiT").value);
   if(isNaN(v)){alert("Enter a number.");return;}
@@ -2116,7 +2448,7 @@ const numOr=(v,lo,hi,fb)=>{const x=parseFloat(v); return (isFinite(x)&&x>=lo&&x<
 $("inLat").onchange=e=>{S.lat=numOr(e.target.value,-90,90,null); S.geoLive=false; save(); status(); render();};
 $("inLon").onchange=e=>{S.lon=numOr(e.target.value,-180,180,null); save(); status(); render();};
 $("btnGeo").onclick=getGeo;
-$("btnReset").onclick=()=>{if(confirm("Erase all calibration?")){localStorage.removeItem("pf");location.reload();}};
+$("btnReset").onclick=()=>{if(confirm("Erase all calibration? (The field logbook is kept.)")){localStorage.removeItem("pf");location.reload();}};
 
 function status(){
   const a=$("stA"),b=$("stB"),c=$("stC");
@@ -2171,8 +2503,13 @@ function status(){
 
 /* boot */
 $("selFrame").value=S.frame; $("selNorth").value=S.northRef; $("selTurn").value=String(S.hdTurn);
+$("selAim").value=S.aimSrc;
+$("manualBox").classList.toggle("hide",S.aimSrc!=="manual");
+$("sightCard").classList.toggle("hide",S.aimSrc!=="sight");
 if(S.psiT!==null) S.calPsi=S.psiT;
+loadLog(); fillGlyphSelect(); if(DBGLOG.length) selIdx=DBGLOG.length-1;
 status(); drawCal(); drawHd(); handPaint(); render(); dbgRefresh();
+if(selIdx!==null) selectRow(selIdx);
 setInterval(render,250);
 if("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(()=>{});
 </script>
