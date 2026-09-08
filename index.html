@@ -90,8 +90,8 @@ hr{border:0;border-top:1px solid var(--line);margin:12px 0}
     </div>
     <div class="tiny dim" id="sightState" style="margin-bottom:8px"></div>
     <div class="row">
-      <button id="btnSightSun" class="pri grow sm">Sight the sun</button>
-      <button id="btnSightBrg" class="grow sm">Sight a bearing</button>
+      <button id="btnSightSun" class="grow sm">Sight the sun</button>
+      <button id="btnSightBrg" class="grow sm">Sight a street</button>
     </div>
 
     <div id="sunBox" class="hide" style="margin-top:10px;border-top:1px solid var(--line);padding-top:10px">
@@ -109,25 +109,30 @@ hr{border:0;border-top:1px solid var(--line);margin:12px 0}
     </div>
 
     <div id="brgBox" class="hide" style="margin-top:10px;border-top:1px solid var(--line);padding-top:10px">
-      <div class="note">Point the phone's back along something whose true bearing you know, then tap
-        Sight. <b>Useful when a building hides the sun.</b> A street grid is an excellent reference —
-        far better than any compass.</div>
-      <label style="margin-top:8px">Reference</label>
+      <div class="note"><b>Sight down a street.</b> Point the phone's back along the roadway and tap
+        Sight. This is the answer when a building hides the sun — a street is a surveyed line, good
+        to a degree or two, which is better than any compass and better than pointing at a landmark.</div>
+      <label style="margin-top:8px">Street you are sighting along</label>
       <select id="selBrg">
         <option value="29">Manhattan avenue, looking uptown — 29°</option>
         <option value="209">Manhattan avenue, looking downtown — 209°</option>
         <option value="119">Manhattan cross street, looking east — 119°</option>
         <option value="299">Manhattan cross street, looking west — 299°</option>
-        <option value="custom">Something else — type the bearing</option>
+        <option value="custom">A bearing I looked up beforehand</option>
       </select>
       <div id="brgCustom" class="hide" style="margin-top:8px">
-        <label>True bearing of what you are pointing at (°)</label>
+        <label>True bearing (°)</label>
         <input id="inBrg" type="number" step="1" placeholder="e.g. 247">
+        <div class="tiny" style="margin-top:6px;color:var(--warn)">Only use a number you measured on
+          a map in advance. Do not read it off a compass — the compass is the thing this whole
+          sighting method exists to avoid.</div>
       </div>
       <button id="btnBrgTake" class="pri" style="width:100%;margin-top:8px">Sight now</button>
-      <div class="tiny dim" style="margin-top:6px">Stand in the middle of the roadway or square-on to
-        the kerb line and sight down it. The Manhattan grid runs 29° east of true north, which is why
-        Manhattanhenge falls at azimuth 299°.</div>
+      <div class="tiny dim" style="margin-top:6px">Stand in the middle of the roadway, or square-on to
+        the kerb line, and sight down it. The Manhattan grid runs 29° east of true north, which is why
+        Manhattanhenge falls at azimuth 299°. Away from the grid, measure the street off a map before
+        you go out — the app deliberately offers no compass and no landmark lookup, because both would
+        be less accurate than the street under your feet.</div>
     </div>
   </div>
 
@@ -137,19 +142,9 @@ hr{border:0;border-top:1px solid var(--line);margin:12px 0}
       <span class="pill">front view</span>
     </div>
     <svg id="ring" viewBox="-320 -320 640 640" aria-label="filter ring"></svg>
-  </div>
-
-  <div class="card">
-    <div class="row" style="margin-bottom:6px">
+    <div class="row" style="margin:8px 0 6px">
       <div class="grow tiny dim">Reading</div>
       <span id="steadyPill" class="pill">—</span>
-    </div>
-    <div id="facingBox" style="background:#0e1216;border:1px solid var(--line);border-radius:11px;
-         padding:10px;margin-bottom:10px">
-      <div class="tiny dim">The app thinks you are facing</div>
-      <div id="facing" style="font-size:26px;font-weight:700;letter-spacing:-.01em">—</div>
-      <div class="tiny" id="facingWarn" style="color:var(--warn);margin-top:4px">
-        If that is not the direction you are actually pointing, stop — everything below is wrong.</div>
     </div>
     <div class="big" id="instr">Waiting for position…</div>
     <div class="tiny dim" id="instr2" style="margin-top:6px"></div>
@@ -176,6 +171,15 @@ hr{border:0;border-top:1px solid var(--line);margin:12px 0}
     <hr>
     <div class="row"><div class="grow" style="font-weight:600">Iron carried with the phone <span class="tiny dim">(compass mode only)</span></div><span id="magPill" class="pill">—</span></div>
     <div class="tiny dim" id="magNote" style="margin-top:6px"></div>
+  </div>
+
+  <div class="card">
+    <div id="facingBox">
+      <div class="tiny dim">The app thinks you are facing</div>
+      <div id="facing" style="font-size:22px;font-weight:700;letter-spacing:-.01em">—</div>
+      <div class="tiny" id="facingWarn" style="color:var(--warn);margin-top:4px">
+        If that is not the direction you are actually pointing, stop — the reading above is wrong.</div>
+    </div>
   </div>
 
   <div class="card">
@@ -617,7 +621,7 @@ hr{border:0;border-top:1px solid var(--line);margin:12px 0}
 
 <script>
 "use strict";
-const APP_VERSION="v16";
+const APP_VERSION="v17";
 const D=Math.PI/180, R2D=180/Math.PI;
 const $=id=>document.getElementById(id);
 const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
@@ -1532,6 +1536,7 @@ function trimForStorage(e,rawKeep){
   return c;
 }
 function saveLog(){
+  backupOnce();
   for(const keep of [80,20,0]){
     try{
       localStorage.setItem(LOGKEY, JSON.stringify({v:1, rows:DBGLOG.map(e=>trimForStorage(e,keep))}));
@@ -1543,19 +1548,45 @@ function saveLog(){
   }catch(err){ return false; }
   return true;
 }
+/* Reading the log back must never be able to lose rows. Three rules:
+   - an unrecognised schema version is still read, not discarded: rows are plain
+     objects and every consumer already tolerates missing fields, so a log
+     written by a newer build loads fine in an older one and vice versa;
+   - a row that fails to parse individually is kept as-is rather than dropping
+     the whole file;
+   - the previous contents are copied to a backup key before the first save of
+     each session, so a bad write cannot destroy a study that took days. */
+const LOGBAK=LOGKEY+"_bak";
+let bakDone=false;
+function backupOnce(){
+  if(bakDone) return; bakDone=true;
+  try{ const cur=localStorage.getItem(LOGKEY); if(cur) localStorage.setItem(LOGBAK,cur); }catch(e){}
+}
 function loadLog(){
-  try{
-    const o=JSON.parse(localStorage.getItem(LOGKEY)||"null");
-    if(o && Array.isArray(o.rows)){ DBGLOG.length=0; for(const r of o.rows) DBGLOG.push(r); }
-  }catch(e){}
+  let o=null;
+  try{ o=JSON.parse(localStorage.getItem(LOGKEY)||"null"); }catch(e){}
+  if(!(o&&Array.isArray(o.rows))){
+    try{ o=JSON.parse(localStorage.getItem(LOGBAK)||"null"); }catch(e){}
+    if(o&&Array.isArray(o.rows)) console.warn("PolarFinder: main log unreadable, recovered the backup");
+  }
+  if(o && Array.isArray(o.rows)){
+    DBGLOG.length=0;
+    for(const r of o.rows) if(r && typeof r==="object") DBGLOG.push(r);
+  }
 }
 
 /* ── entering the truth as a MARKING rather than a number ── */
 const GLYPH_OPTS=[...GLYPHS].sort((a,b)=>a.psi-b.psi);
 function glyphLabel(g){ return "“"+g.c+"” of "+g.tok+"   ("+g.psi.toFixed(0)+"°)"; }
+/* "exact" records the truth as the app's own prediction, i.e. error zero. It is
+   a real answer, not a shortcut: when the darkest setting lands where the app
+   said, the honest truth value IS the predicted angle, and reading it back off
+   the ring by eye would only add your own quantisation to a correct answer. */
+const EXACT="exact";
 function fillGlyphSelect(){
   const sel=$("selGlyph");
   sel.innerHTML='<option value="">— pick the marking at the top —</option>'+
+    '<option value="'+EXACT+'">✓ Exactly where the app said — no adjustment needed</option>'+
     GLYPH_OPTS.map((g,i)=>'<option value="'+i+'">'+glyphLabel(g)+'</option>').join("");
 }
 let selIdx=null;   // which log row is being edited
@@ -1580,7 +1611,9 @@ function selectRow(i){
   $("selFacing").textContent=e.solved? CARD16(e.solved.camAzUsed)+" "+e.solved.camAzUsed.toFixed(0)+"°"+
     (e.solved.camEl>8?" ↑":e.solved.camEl<-8?" ↓":"") : "—";
   const t=rowTruthDeg(e);
-  if(t!=null){
+  if(t!=null && e.observed && e.observed.exact){
+    $("selGlyph").value=EXACT; $("selNudge").value="0";
+  } else if(t!=null){
     let best=0,bd=1e9;
     GLYPH_OPTS.forEach((g,k)=>{ let x=Math.abs(mod(g.psi-t,360)); x=Math.min(x,360-x);
       if(x<bd){bd=x;best=k;} });
@@ -1716,14 +1749,29 @@ $("btnDbgClear").onclick=()=>{
   if(!confirm("Delete all "+DBGLOG.length+" logged readings? This cannot be undone."))return;
   DBGLOG.length=0; selIdx=null; saveLog(); dbgRefresh(); $("dbgMsg").textContent="Log cleared.";
 };
+$("selGlyph").onchange=()=>{
+  const ex=$("selGlyph").value===EXACT;
+  $("selNudge").disabled=ex;
+  if(ex) $("selNudge").value="0";
+  $("selNudge").style.opacity=ex?0.4:1;
+};
 $("btnRowSave").onclick=()=>{
   if(selIdx==null||!DBGLOG[selIdx]){alert("Tap a row in the table first.");return;}
   const gi=$("selGlyph").value;
   const e=DBGLOG[selIdx];
   e.observed=e.observed||{};
   if(gi===""){ $("rowMsg").textContent="Pick a marking, or use Clear truth."; return; }
-  const nud=parseFloat($("selNudge").value); 
-  const deg=mod(GLYPH_OPTS[+gi].psi + (isFinite(nud)?nud:0), 360);
+  let deg;
+  if(gi===EXACT){
+    if(!e.solved || e.solved.psiTopShown==null){
+      $("rowMsg").textContent="This row has no prediction to agree with — pick a marking instead."; return; }
+    deg=mod(e.solved.psiTopShown, 360);
+    e.observed.exact=true;
+  } else {
+    const nud=parseFloat($("selNudge").value);
+    deg=mod(GLYPH_OPTS[+gi].psi + (isFinite(nud)?nud:0), 360);
+    e.observed.exact=false;
+  }
   e.observed.darkestRingDeg=deg;
   e.observed.confidence=$("selConf").value;
   e.observed.note=$("selNote").value||null;
@@ -2115,9 +2163,18 @@ function sightPaint(){
     (mins<1?(age/1000).toFixed(0)+" seconds":mins.toFixed(1)+" minutes")+" ago."+
     (mins>2?"  Drift is roughly a degree a minute — sight again for best accuracy.":"");
 }
+/* Keep the two chooser buttons showing which panel is actually open. Only the
+   open one is highlighted; with neither open, neither is. */
+function sightBtnPaint(){
+  const sunOpen=!$("sunBox").classList.contains("hide");
+  const brgOpen=!$("brgBox").classList.contains("hide");
+  $("btnSightSun").classList.toggle("pri", sunOpen);
+  $("btnSightBrg").classList.toggle("pri", brgOpen);
+}
 $("btnSightSun").onclick=()=>{
   $("sunBox").classList.toggle("hide");
   $("brgBox").classList.add("hide");
+  sightBtnPaint();
   const az=(S.lat===null||S.lon===null)?null:sunPosition(new Date(),S.lat,S.lon);
   $("sunHint").textContent = az? ("Right now the sun is at "+az.az.toFixed(0)+"° true, "+
     az.alt.toFixed(0)+"° up."+(az.alt<3?"  It is too low or below the horizon — use a bearing instead.":"")) 
@@ -2126,6 +2183,7 @@ $("btnSightSun").onclick=()=>{
 $("btnSightBrg").onclick=()=>{
   $("brgBox").classList.toggle("hide");
   $("sunBox").classList.add("hide");
+  sightBtnPaint();
 };
 $("selBrg").onchange=e=>{
   $("brgCustom").classList.toggle("hide", e.target.value!=="custom");
@@ -2142,7 +2200,7 @@ function sunSight(side){
   if(!takeSight(aimTrue,"the sun ("+(side==="left"?"on the left":"on the right")+")")){
     alert("No gyro reading yet — tap Enable sensors and move the phone slightly.");return;}
   save(); sightPaint(); render();
-  $("sunBox").classList.add("hide");
+  $("sunBox").classList.add("hide"); sightBtnPaint();
 };
 $("btnSunLeft").onclick=()=>sunSight("left");
 $("btnSunRight").onclick=()=>sunSight("right");
@@ -2154,7 +2212,7 @@ $("btnBrgTake").onclick=()=>{
     $("selBrg").options[$("selBrg").selectedIndex].textContent.split(" — ")[0];
   if(!takeSight(b,lbl)){alert("No gyro reading yet — tap Enable sensors and move the phone slightly.");return;}
   S.sightBearing=b; save(); sightPaint(); render();
-  $("brgBox").classList.add("hide");
+  $("brgBox").classList.add("hide"); sightBtnPaint();
 };
 $("inAz").oninput=e=>{S.manAz=numOr(e.target.value,-3600,3600,0);};
 $("inEl").oninput=e=>{S.manEl=numOr(e.target.value,-90,90,0);};
@@ -2507,7 +2565,7 @@ $("selAim").value=S.aimSrc;
 $("manualBox").classList.toggle("hide",S.aimSrc!=="manual");
 $("sightCard").classList.toggle("hide",S.aimSrc!=="sight");
 if(S.psiT!==null) S.calPsi=S.psiT;
-loadLog(); fillGlyphSelect(); if(DBGLOG.length) selIdx=DBGLOG.length-1;
+sightBtnPaint(); loadLog(); fillGlyphSelect(); if(DBGLOG.length) selIdx=DBGLOG.length-1;
 status(); drawCal(); drawHd(); handPaint(); render(); dbgRefresh();
 if(selIdx!==null) selectRow(selIdx);
 setInterval(render,250);

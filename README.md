@@ -66,7 +66,7 @@ The thin-shadow position is a *sharp* setting, unlike "point at the sun", which 
 safer and more accurate. The app knows the sun's true azimuth, so edge-on means your aim is that
 azimuth ∓ 90°.
 
-### When a building hides the sun — sight a street or a landmark
+### When a building hides the sun — sight a street
 
 Manhattan is unusually good for this. The 1811 grid runs **29° east of true north**, which is why
 Manhattanhenge falls at azimuth 299°. Stand in the roadway or square to the kerb, point the phone along
@@ -79,9 +79,17 @@ it, and pick the preset:
 | East along a cross street | **119°** |
 | West along a cross street | **299°** |
 
-Outside the grid, use **Something else** and type any bearing you know: a landmark you can read off a
-map, a runway heading, a road on a compass rose. Sight down a *long* line rather than a short one — the
-further the reference, the smaller the angular error.
+Outside the grid, use **A bearing I looked up beforehand** — measure the street off a map at home and
+type that number. Sight down a *long* line rather than a short one: the further the reference, the
+smaller the angular error.
+
+**There is deliberately no landmark lookup and no compass here.** Both were considered and rejected.
+A landmark's bearing is only as good as its angular width from where you stand — the Empire State
+Building is about 130 m across, so from 3 km it is worth ±1.2° and from 800 m it collapses to ±5°,
+worse than the street you are standing on. And reading a bearing off the phone's compass to feed the
+sighting method would reintroduce exactly the error the method exists to eliminate. If you find
+yourself wanting a number and not having one, the honest move is to sight the sun, sight a street,
+or accept the compass fallback knowingly — not to manufacture a reference.
 
 ### Accuracy, and why this beats the compass
 
