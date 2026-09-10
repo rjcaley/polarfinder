@@ -1763,16 +1763,29 @@ function renderTable(){
   });
 }
 
-/* one-word description of how the bearing was set, for the table and summary */
+/* Short description of how the bearing was set, for the table and the summary.
+   The DIRECTION is part of the identity, not decoration: a constant heading
+   offset or a handedness error shows up as a bias that depends on which way you
+   were facing, so uptown and downtown must not share a bucket. Streets are
+   tagged with the bearing itself — "st 29°" — and the sun with which side it
+   was on, both of which are what the analysis actually keys on. */
+function sightBase(g){
+  const m=g.method||"unknown";
+  if(m==="sun")   return "sun " + (/left/i.test(g.label||"") ? "L" : "R");
+  if(m==="typed") return "typed";
+  if(m==="street"){
+    if(g.bearingTrue!=null) return "st "+Math.round(g.bearingTrue)+"°";
+    return "st ?";
+  }
+  return "?";
+}
 function sightTag(e){
   const g=e&&e.sight;
   if(!g) return "?";                       // logged before v17 recorded this
   if(!g.used) return (g.methodSource==="recalled"?"~":"")+(g.aimSrc==="manual"?"typed":"compass");
   if(!g.taken) return "none";
-  const m=g.method||"unknown";
-  let base = m==="sun"?"sun" : m==="street"?"street" : m==="typed"?"typed" : "?";
+  const base=sightBase(g);
   if(g.methodSource==="recalled") return "~"+base;   // remembered, not measured
-
   if(g.gyroBroken) return base+"!";        // gyro restarted: the sight was void
   if(g.validAtCapture===false) return base+"✗";
   if(g.ageMin!=null && g.ageMin>2) return base+" "+g.ageMin.toFixed(0)+"m";
@@ -1815,7 +1828,13 @@ function dbgSummary(){
   DBGLOG.forEach(e=>{ const k=sightTag(e).replace(/^~/,"").replace(/[!✗]|\s\d+m$/g,"")||"?";
     (by[k]=by[k]||[]).push(logErr(e)); });
   const nRecalled=DBGLOG.filter(e=>e.sight&&e.sight.methodSource==="recalled").length;
-  const parts=Object.keys(by).sort().map(k=>{
+  const natural=(a,b)=>{                    // "st 29°" before "st 119°", not after
+    const na=(a.match(/(\d+)/)||[])[1], nb=(b.match(/(\d+)/)||[])[1];
+    const pa=a.replace(/\d+/,""), pb=b.replace(/\d+/,"");
+    if(pa!==pb) return pa<pb?-1:1;
+    return (+na||0)-(+nb||0);
+  };
+  const parts=Object.keys(by).sort(natural).map(k=>{
     const v=by[k].filter(x=>x!=null).sort((a,b)=>a-b);
     const med=v.length? v[Math.floor(v.length/2)].toFixed(1)+"°" : "no truth yet";
     return k+" "+by[k].length+" ("+med+")";

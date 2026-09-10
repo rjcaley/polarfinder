@@ -554,13 +554,18 @@ independent routes, against a filter that was turned by roughly a right angle.
 the method (`sun` / `street` / `typed`, or `used:false` for compass and typed-bearing modes), the
 human label (*which* street, *which* side the sun was on), the bearing itself, how many minutes old
 the sight was when you pressed Hold, whether it was still valid, and whether the gyro had restarted
-and voided it. The readings table shows a short tag per row — `sun`, `street`, `street 5m` for one
-that had been drifting five minutes, `street!` for one voided by a gyro restart, `compass` for the
-fallback — and the copied summary breaks the median error down by method. Rows logged before v17
-show `?`, since the field did not exist yet.
+and voided it. The readings table shows a short tag per row, and **the direction is part of the tag, not just the
+method**: `st 29°` for an avenue sighted uptown, `st 209°` downtown, `st 119°` and `st 299°` for the
+cross streets, `sun L` / `sun R` for which side the sun was on. Suffixes mark trouble — `st 29° 5m`
+for a sight that had been drifting five minutes, `st 29°!` for one voided by a gyro restart, `✗` for
+one already expired. `compass` is the fallback. Rows logged before v17 show `?`.
 
-This matters because the methods are not interchangeable. A sun sight and a street sight fail in
-different ways, and a median computed across a mixed set can hide one bad method behind a good one.
+The copied summary breaks median error down by that same tag, so each direction is its own bucket.
+This is the whole point. The methods are not interchangeable and neither are the directions: a
+constant heading offset, a handedness error, or local iron all produce a bias that *depends on which
+way you were facing*. Pooling uptown with downtown averages such a bias toward zero and hides it.
+Four readings that look fine as one "street" bucket can be +6° uptown and −6° downtown, which is not
+a good result at all — it is a 12° systematic error wearing a disguise.
 
 **Recalled methods are never stored as recorded ones.** A reading logged before v17 has no method,
 and you can supply one from memory in the row editor. It is stamped `methodSource:"recalled"`, shown
