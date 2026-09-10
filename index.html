@@ -577,11 +577,31 @@ hr{border:0;border-top:1px solid var(--line);margin:12px 0}
     </div>
     <div class="tiny dim" style="margin-top:4px">Use Nudge if the darkest point sat between two letters —
       positive goes toward MASTER, negative back toward “46”. Either 180° twin is fine.</div>
+
+    <label style="margin-top:10px">How the bearing was established</label>
+    <select id="selMethod">
+      <option value="">— not known —</option>
+      <option value="sun:left">Sun sight — sun on my LEFT</option>
+      <option value="sun:right">Sun sight — sun on my RIGHT</option>
+      <option value="street:29">Street — avenue, looking uptown (29°)</option>
+      <option value="street:209">Street — avenue, looking downtown (209°)</option>
+      <option value="street:119">Street — cross street, looking east (119°)</option>
+      <option value="street:299">Street — cross street, looking west (299°)</option>
+      <option value="street:?">Street — some other street</option>
+      <option value="typed:?">Typed a bearing I looked up</option>
+      <option value="compass:?">Phone compass (no sighting)</option>
+    </select>
+    <div class="tiny dim" id="methodNote" style="margin-top:4px"></div>
+
     <label style="margin-top:8px">Note (subject, sky, anything odd)</label>
     <input id="selNote" type="text" placeholder="e.g. facing the park, thin cloud">
     <div class="row" style="margin-top:10px">
       <button id="btnRowSave" class="pri grow">Save row</button>
       <button id="btnRowClear">Clear truth</button>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button id="btnRowDelete" class="sm hot grow">Delete this row</button>
+      <button id="btnRowUndo" class="sm grow" disabled>Undo delete</button>
     </div>
     <div class="tiny dim" style="margin-top:6px" id="rowMsg"></div>
   </div>
@@ -981,9 +1001,14 @@ function describe(psiTop){
 const SIGHT_WARN=120000, SIGHT_STALE=600000;
 function sightAgeMs(){ return S.sight? nowMs()-S.sight.t : Infinity; }
 function sightOK(){ return !!S.sight && !S.sight.broken && sightAgeMs()<SIGHT_STALE; }
-function takeSight(trueBearing,label){
+/* `method` is a stable machine-readable tag — "sun", "street", "typed" — kept
+   alongside the human label so the exported log can be grouped by how the
+   bearing was obtained. The two have different error signatures, so a study
+   that cannot tell them apart cannot explain its own outliers. */
+function takeSight(trueBearing,label,method){
   if(S.relAz===null||S.relAz===undefined) return false;
   S.sight={yawOffset:mod(trueBearing-S.relAz,360), t:nowMs(), label:label,
+           method:method||"unknown",
            bearing:+mod(trueBearing,360).toFixed(2), relAtSight:+S.relAz.toFixed(2), broken:false};
   return true;
 }
@@ -1415,6 +1440,22 @@ function buildSnapshot(tag){
       calibration:{ psiT:S.psiT, hand:S.hand, handDone:S.handDone, hdPsi1:S.hdPsi1, hdPsi2:S.hdPsi2,
         hdTurn:S.hdTurn, northRef:S.northRef, walkDone:S.walkDone, walkDiff:S.walkDiff,
         walkOffset:S.walkOffset, manualTrim:S.off, siteFix:S.siteFix, frame:S.frame, aimSrc:S.aimSrc },
+      /* HOW the bearing was established, and how old it was when this reading was
+         taken. Without this a study cannot separate a sun sight from a street
+         sight, or a fresh sight from one that had been drifting for ten minutes. */
+      sight: (S.aimSrc!=="sight") ? {used:false, aimSrc:S.aimSrc}
+        : (!S.sight ? {used:true, taken:false} : {
+            used:true, taken:true,
+            method:S.sight.method||"unknown",
+            label:S.sight.label||null,
+            bearingTrue:S.sight.bearing,
+            ageMs: Math.round(sightAgeMs()),
+            ageMin:+(sightAgeMs()/60000).toFixed(2),
+            validAtCapture: sightOK(),
+            gyroBroken: !!S.sight.broken,
+            yawOffset:+S.sight.yawOffset.toFixed(3),
+            relAtSight:S.sight.relAtSight,
+            relNow:S.relAz===null||S.relAz===undefined?null:+S.relAz.toFixed(2) }),
       position: (S.lat===null||S.lon===null)? null
         : {lat:+S.lat.toFixed(6), lon:+S.lon.toFixed(6), accM:S.acc},
       rawAim:{ az:S.az===null?null:+S.az.toFixed(3), el:S.el===null?null:+S.el.toFixed(3),
@@ -1622,8 +1663,72 @@ function selectRow(i){
   } else { $("selGlyph").value=""; $("selNudge").value="0"; }
   $("selConf").value=(e.observed&&e.observed.confidence)||"ok";
   $("selNote").value=(e.observed&&e.observed.note)||"";
+  paintMethodPicker(e);
   $("rowMsg").textContent="";
   dbgRefresh();
+}
+/* ── the sighting method, recorded or recalled ──
+   A method the app watched you use and one you remembered afterwards are not
+   the same evidence, so they are never stored in the same way. Anything the app
+   recorded itself is read-only: letting it be overwritten would quietly destroy
+   the only trustworthy provenance in the file. Anything you supply later is
+   stamped methodSource:"recalled" and shown with a leading ~ in the table, so
+   no later analysis can mistake memory for measurement. */
+const METHOD_LABEL={
+  "sun:left":"the sun (on the left)", "sun:right":"the sun (on the right)",
+  "street:29":"Manhattan avenue, looking uptown",
+  "street:209":"Manhattan avenue, looking downtown",
+  "street:119":"Manhattan cross street, looking east",
+  "street:299":"Manhattan cross street, looking west",
+  "street:?":"a street (not recorded which)",
+  "typed:?":"a bearing typed in", "compass:?":"the phone compass"
+};
+function methodIsRecorded(e){
+  return !!(e && e.sight && e.sight.used && e.sight.taken &&
+            e.sight.method && e.sight.method!=="unknown" &&
+            e.sight.methodSource!=="recalled");
+}
+function methodKeyOf(e){
+  const g=e&&e.sight; if(!g) return "";
+  if(g.used===false) return g.aimSrc==="sensor" ? "compass:?" : (g.aimSrc==="manual"?"typed:?":"");
+  if(!g.taken||!g.method||g.method==="unknown") return "";
+  if(g.method==="sun") return /left/i.test(g.label||"") ? "sun:left" : "sun:right";
+  if(g.method==="street"){
+    const b=g.bearingTrue;
+    for(const k of ["29","209","119","299"]) if(b!=null && Math.abs(b-(+k))<0.6) return "street:"+k;
+    return "street:?";
+  }
+  if(g.method==="typed") return "typed:?";
+  return "";
+}
+function applyRecalledMethod(e,key){
+  if(!key){ if(e.sight && e.sight.methodSource==="recalled") delete e.sight; return; }
+  const [m,arg]=key.split(":");
+  if(m==="compass"){ e.sight={used:false, aimSrc:"sensor", methodSource:"recalled"}; return; }
+  const g={used:true, taken:true, method:m, label:METHOD_LABEL[key]||key,
+           methodSource:"recalled",
+           /* deliberately absent: age, validity, yaw offset. Those were never
+              recorded and cannot be remembered, so they stay null rather than
+              being guessed. */
+           bearingTrue:(m==="street"&&arg!=="?")?+arg:null,
+           ageMs:null, ageMin:null, validAtCapture:null, gyroBroken:null,
+           yawOffset:null, relAtSight:null, relNow:null};
+  e.sight=g;
+}
+function paintMethodPicker(e){
+  const sel=$("selMethod"), note=$("methodNote");
+  const key=methodKeyOf(e);
+  sel.value=key||"";
+  if(methodIsRecorded(e)){
+    sel.disabled=true; sel.style.opacity=0.55;
+    note.innerHTML='Recorded by the app at the time — not editable.';
+  } else {
+    sel.disabled=false; sel.style.opacity=1;
+    note.innerHTML= (e && e.sight && e.sight.methodSource==="recalled")
+      ? 'From memory, not measured. Shown as <b>~</b> in the table and counted separately.'
+      : 'This reading predates method logging. If you remember, set it here — it will be '+
+        'marked as recalled rather than recorded.';
+  }
 }
 function CARD16(az){
   const C=["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"];
@@ -1634,7 +1739,7 @@ function renderTable(){
   const t=$("logTable");
   if(!DBGLOG.length){ t.innerHTML='<tr><td class="dim">No readings yet — tap Hold reading on the Aim tab.</td></tr>'; return; }
   const hdr='<tr style="text-align:left;color:var(--dim)">'+
-    ["#","Date","Time","Facing","App said","Truth","Err"].map(x=>'<th style="padding:4px 6px;border-bottom:1px solid var(--line);white-space:nowrap">'+x+'</th>').join("")+'</tr>';
+    ["#","Date","Time","Sight","Facing","App said","Truth","Err"].map(x=>'<th style="padding:4px 6px;border-bottom:1px solid var(--line);white-space:nowrap">'+x+'</th>').join("")+'</tr>';
   const rows=DBGLOG.map((e,i)=>{
     const dt=new Date(e.capturedISO), err=logErr(e), t2=rowTruthDeg(e);
     const sel=(i===selIdx);
@@ -1642,6 +1747,7 @@ function renderTable(){
       (i+1),
       dt.toLocaleDateString([], {month:"short",day:"numeric"}),
       dt.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}),
+      sightTag(e),
       e.solved? CARD16(e.solved.camAzUsed)+" "+e.solved.camAzUsed.toFixed(0)+"°" : "—",
       e.solved? rowLabel(e.solved.psiTopShown) : "—",
       t2!=null? rowLabel(t2) : '<span style="color:var(--warn)">needed</span>',
@@ -1649,12 +1755,28 @@ function renderTable(){
     ];
     return '<tr data-i="'+i+'" style="cursor:pointer;'+(sel?"background:#1f2a36;":"")+'">'+
       cells.map((c,k)=>'<td style="padding:5px 6px;border-bottom:1px solid #1b2027;'+
-        (k>=4?"":"white-space:nowrap;")+'">'+c+'</td>').join("")+'</tr>';
+        (k>=5?"":"white-space:nowrap;")+'">'+c+'</td>').join("")+'</tr>';
   }).join("");
   t.innerHTML=hdr+rows;
   [...t.querySelectorAll("tr[data-i]")].forEach(tr=>{
     tr.onclick=()=>selectRow(+tr.getAttribute("data-i"));
   });
+}
+
+/* one-word description of how the bearing was set, for the table and summary */
+function sightTag(e){
+  const g=e&&e.sight;
+  if(!g) return "?";                       // logged before v17 recorded this
+  if(!g.used) return (g.methodSource==="recalled"?"~":"")+(g.aimSrc==="manual"?"typed":"compass");
+  if(!g.taken) return "none";
+  const m=g.method||"unknown";
+  let base = m==="sun"?"sun" : m==="street"?"street" : m==="typed"?"typed" : "?";
+  if(g.methodSource==="recalled") return "~"+base;   // remembered, not measured
+
+  if(g.gyroBroken) return base+"!";        // gyro restarted: the sight was void
+  if(g.validAtCapture===false) return base+"✗";
+  if(g.ageMin!=null && g.ageMin>2) return base+" "+g.ageMin.toFixed(0)+"m";
+  return base;
 }
 
 function logStats(){
@@ -1672,7 +1794,8 @@ function dbgPayload(){
       return {rows:DBGLOG.length, withTruth:g.done, days:g.days, octantsCovered:g.dirs,
               medianErrDeg:a?+a.med.toFixed(2):null, p10:a?+a.p10.toFixed(2):null,
               p90:a?+a.p90.toFixed(2):null, meanSignedDeg:a?+a.mean.toFixed(2):null,
-              sdDeg:a?+a.sd.toFixed(2):null};})(),
+              sdDeg:a?+a.sd.toFixed(2):null,
+              sightMethodRecalledRows:DBGLOG.filter(e=>e.sight&&e.sight.methodSource==="recalled").length};})(),
     current:currentSnapshot(),
     log:DBGLOG.map(e=>enrich(JSON.parse(JSON.stringify(e))))}, null, 1);
 }
@@ -1686,12 +1809,26 @@ function dbgSummary(){
   L.push("rows "+DBGLOG.length+", with truth "+g.done+", days "+g.days+", octants "+g.dirs);
   if(a) L.push("median error "+a.med.toFixed(1)+"°, p10-p90 "+a.p10.toFixed(1)+"–"+a.p90.toFixed(1)+
                "°, mean signed "+a.mean.toFixed(1)+"°, sd "+a.sd.toFixed(1)+"°");
+  /* group by how the bearing was established: the methods are not interchangeable,
+     and a median computed across all of them can hide a bad one. */
+  const by={};
+  DBGLOG.forEach(e=>{ const k=sightTag(e).replace(/^~/,"").replace(/[!✗]|\s\d+m$/g,"")||"?";
+    (by[k]=by[k]||[]).push(logErr(e)); });
+  const nRecalled=DBGLOG.filter(e=>e.sight&&e.sight.methodSource==="recalled").length;
+  const parts=Object.keys(by).sort().map(k=>{
+    const v=by[k].filter(x=>x!=null).sort((a,b)=>a-b);
+    const med=v.length? v[Math.floor(v.length/2)].toFixed(1)+"°" : "no truth yet";
+    return k+" "+by[k].length+" ("+med+")";
+  });
+  if(parts.length) L.push("by sighting method: "+parts.join(", "));
+  if(nRecalled) L.push("  ("+nRecalled+" of these were recalled afterwards, not recorded — marked ~)");
   L.push("");
-  L.push("#  date       time   facing      app said                 truth                    err");
+  L.push("#  date       time   sight    facing      app said                 truth                    err");
   DBGLOG.forEach((e,i)=>{
     const dt=new Date(e.capturedISO), err=logErr(e), t2=rowTruthDeg(e);
     L.push(String(i+1).padEnd(3)+dt.toISOString().slice(0,10)+" "+
       dt.toTimeString().slice(0,5)+"  "+
+      sightTag(e).padEnd(9)+
       (e.solved? (CARD16(e.solved.camAzUsed)+" "+e.solved.camAzUsed.toFixed(0)+"°").padEnd(11):"—".padEnd(11))+
       (e.solved? rowLabel(e.solved.psiTopShown).slice(0,24).padEnd(25):"—".padEnd(25))+
       (t2!=null? rowLabel(t2).slice(0,24).padEnd(25):"(none)".padEnd(25))+
@@ -1775,6 +1912,7 @@ $("btnRowSave").onclick=()=>{
   e.observed.darkestRingDeg=deg;
   e.observed.confidence=$("selConf").value;
   e.observed.note=$("selNote").value||null;
+  if(!methodIsRecorded(e)) applyRecalledMethod(e, $("selMethod").value);
   enrich(e);
   saveLog(); dbgRefresh();
   const err=logErr(e);
@@ -1785,6 +1923,51 @@ $("btnRowClear").onclick=()=>{
   if(selIdx==null||!DBGLOG[selIdx])return;
   DBGLOG[selIdx].observed={darkestRingDeg:null,note:null};
   saveLog(); selectRow(selIdx); $("rowMsg").textContent="Truth cleared for row "+(selIdx+1)+".";
+};
+$("selMethod").onchange=()=>{
+  if(selIdx==null||!DBGLOG[selIdx]) return;
+  const e=DBGLOG[selIdx];
+  if(methodIsRecorded(e)) return;                 // recorded data is not editable
+  applyRecalledMethod(e, $("selMethod").value);
+  saveLog(); paintMethodPicker(e); dbgRefresh();
+  $("rowMsg").textContent = $("selMethod").value
+    ? "Row "+(selIdx+1)+" marked as “"+(METHOD_LABEL[$("selMethod").value]||"?")+"”, recalled."
+    : "Sighting method cleared for row "+(selIdx+1)+".";
+};
+
+/* ── deleting a row ──
+   A row can represent a trip outdoors that cannot be repeated, so deletion is
+   confirmed, and the deleted row is held in memory so it can be put back at the
+   original index. The undo lasts as long as the page is open; the storage
+   backup written on the first save of each session is the longer-lived net. */
+let lastDeleted=null;
+function paintUndo(){
+  $("btnRowUndo").disabled = !lastDeleted;
+  $("btnRowUndo").textContent = lastDeleted
+    ? "Undo delete (row "+(lastDeleted.at+1)+")" : "Undo delete";
+}
+$("btnRowDelete").onclick=()=>{
+  if(selIdx==null||!DBGLOG[selIdx]){ $("rowMsg").textContent="Tap a row in the table first."; return; }
+  const e=DBGLOG[selIdx];
+  const when=new Date(e.capturedISO).toLocaleString();
+  const hasTruth=rowTruthDeg(e)!=null;
+  if(!confirm("Delete row "+(selIdx+1)+" of "+DBGLOG.length+"?\n\n"+when+
+              (hasTruth?"\nThis row has a truth value and counts toward your results.":"")+
+              "\n\nYou can undo this while the app stays open."))return;
+  lastDeleted={row:JSON.parse(JSON.stringify(e)), at:selIdx};
+  DBGLOG.splice(selIdx,1);
+  selIdx = DBGLOG.length ? Math.min(selIdx, DBGLOG.length-1) : null;
+  saveLog();
+  if(selIdx!=null) selectRow(selIdx); else { $("selRow").textContent="none selected"; dbgRefresh(); }
+  paintUndo();
+  $("rowMsg").textContent="Row deleted. "+DBGLOG.length+" left. Undo is available until you close the app.";
+};
+$("btnRowUndo").onclick=()=>{
+  if(!lastDeleted) return;
+  const at=Math.min(lastDeleted.at, DBGLOG.length);
+  DBGLOG.splice(at,0,lastDeleted.row);
+  lastDeleted=null; saveLog(); selectRow(at); paintUndo();
+  $("rowMsg").textContent="Row restored at position "+(at+1)+".";
 };
 
 /* ═══════════ sensors ═══════════ */
@@ -2197,7 +2380,7 @@ function sunSight(side){
   /* Phone edge-on to the sun: the sun lies 90 degrees to one side of where the
      back is pointing. So the aim's true bearing is the sun's azimuth -/+ 90. */
   const aimTrue=mod(sp.az + (side==="left"? 90 : -90), 360);
-  if(!takeSight(aimTrue,"the sun ("+(side==="left"?"on the left":"on the right")+")")){
+  if(!takeSight(aimTrue,"the sun ("+(side==="left"?"on the left":"on the right")+")","sun")){
     alert("No gyro reading yet — tap Enable sensors and move the phone slightly.");return;}
   save(); sightPaint(); render();
   $("sunBox").classList.add("hide"); sightBtnPaint();
@@ -2210,7 +2393,8 @@ $("btnBrgTake").onclick=()=>{
   if(!isFinite(b)){alert("Enter the true bearing you are pointing along.");return;}
   const lbl=(v==="custom")? "a bearing you entered" :
     $("selBrg").options[$("selBrg").selectedIndex].textContent.split(" — ")[0];
-  if(!takeSight(b,lbl)){alert("No gyro reading yet — tap Enable sensors and move the phone slightly.");return;}
+  if(!takeSight(b,lbl,(v==="custom")?"typed":"street")){
+    alert("No gyro reading yet — tap Enable sensors and move the phone slightly.");return;}
   S.sightBearing=b; save(); sightPaint(); render();
   $("brgBox").classList.add("hide"); sightBtnPaint();
 };
@@ -2565,7 +2749,7 @@ $("selAim").value=S.aimSrc;
 $("manualBox").classList.toggle("hide",S.aimSrc!=="manual");
 $("sightCard").classList.toggle("hide",S.aimSrc!=="sight");
 if(S.psiT!==null) S.calPsi=S.psiT;
-sightBtnPaint(); loadLog(); fillGlyphSelect(); if(DBGLOG.length) selIdx=DBGLOG.length-1;
+sightBtnPaint(); loadLog(); fillGlyphSelect(); paintUndo(); if(DBGLOG.length) selIdx=DBGLOG.length-1;
 status(); drawCal(); drawHd(); handPaint(); render(); dbgRefresh();
 if(selIdx!==null) selectRow(selIdx);
 setInterval(render,250);

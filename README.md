@@ -550,6 +550,30 @@ the front-face plane, removes it. The check that this worked: the aperture is ro
 ratio of 0.998, and the two photographs' recovered rotation differs by 93.2° and 89.0° by two
 independent routes, against a filter that was turned by roughly a right angle.
 
+**Every logged reading records how its bearing was established.** Each row carries a `sight` block:
+the method (`sun` / `street` / `typed`, or `used:false` for compass and typed-bearing modes), the
+human label (*which* street, *which* side the sun was on), the bearing itself, how many minutes old
+the sight was when you pressed Hold, whether it was still valid, and whether the gyro had restarted
+and voided it. The readings table shows a short tag per row — `sun`, `street`, `street 5m` for one
+that had been drifting five minutes, `street!` for one voided by a gyro restart, `compass` for the
+fallback — and the copied summary breaks the median error down by method. Rows logged before v17
+show `?`, since the field did not exist yet.
+
+This matters because the methods are not interchangeable. A sun sight and a street sight fail in
+different ways, and a median computed across a mixed set can hide one bad method behind a good one.
+
+**Recalled methods are never stored as recorded ones.** A reading logged before v17 has no method,
+and you can supply one from memory in the row editor. It is stamped `methodSource:"recalled"`, shown
+with a leading `~` in the table, and counted separately in both the copied summary and the export
+(`summary.sightMethodRecalledRows`). The fields that could not possibly be remembered — how stale the
+sight was, whether it was still valid, the gyro yaw offset — stay `null` rather than being guessed.
+A method the app recorded itself is read-only: the picker is disabled for those rows, because letting
+memory overwrite measurement would destroy the only trustworthy provenance in the file.
+
+**Deleting a row is confirmed and undoable.** The confirm dialog names the row's date and warns if it
+carries a truth value. Undo restores it at its original index and lasts as long as the app stays open;
+beyond that, the storage backup written on the first save of each session is the longer-lived net.
+
 **WMM's 0.4° is core-field model error only.** It excludes crustal and built-environment anomalies,
 which in a city dwarf it. Treat it as a floor, not as achieved accuracy.
 
